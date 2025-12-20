@@ -3,7 +3,7 @@
 
 // We need to show lots of internal details of the module which are not
 // exposed via public API, so include the internal header file.
-#include "../../src/audio/libxm/xm_internal.h"
+// #include "../../src/audio/libxm/xm_internal.h"
 
 #define CLAMP(x, min, max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
 
@@ -194,10 +194,10 @@ enum Page page_song(void) {
 	if (song_type == SONG_XM) {
 		xm64player_open(&xm, cur_rom);
 		xm64player_play(&xm, 0);
-		song_name = xm_get_module_name(xm.ctx);
+		// song_name = xm_get_module_name(xm.ctx);
 		song_channels = xm64player_num_channels(&xm);	
 
-		song_ramsz = sizeof(xm64player_t) + xm.ctx->ctx_size;
+		// song_ramsz = sizeof(xm64player_t) + xm.ctx->ctx_size;
 		#if XM_STREAM_PATTERNS
 		song_ramsz -= xm.ctx->ctx_size_all_patterns;
 		song_ramsz += xm.ctx->ctx_size_stream_pattern_buf;
@@ -238,11 +238,11 @@ enum Page page_song(void) {
 		graphics_draw_text(disp, 20, 70, sbuf);
 
 		if (song_type == SONG_XM) {
-			xm_pattern_t* pat = xm.ctx->module.patterns + xm.ctx->module.pattern_table[xm.ctx->current_table_index];
+			// xm_pattern_t* pat = xm.ctx->module.patterns + xm.ctx->module.pattern_table[xm.ctx->current_table_index];
 			int pos, row;
 			xm64player_tell(&xm, &pos, &row, NULL);
-			sprintf(sbuf, "Pos: %02x/%02x Row: %02x/%02x\n", pos, xm_get_module_length(xm.ctx), row, pat->num_rows);
-			graphics_draw_text(disp, 280, 50, sbuf);			
+			// sprintf(sbuf, "Pos: %02x/%02x Row: %02x/%02x\n", pos, xm_get_module_length(xm.ctx), row, pat->num_rows);
+			// graphics_draw_text(disp, 280, 50, sbuf);			
 		} else if (song_type == SONG_YM) {
 			int pos, len;
 			ym64player_duration(&ym, &len, NULL);
@@ -280,11 +280,11 @@ enum Page page_song(void) {
 			// names (nobody use the instrument names as... instrument names).
 			// So display those on the screen, and also allow for some scrolling
 			// as they could be many lines.
-			for (int i=0; i<11; i++) {
-				if (screen_first_inst + i >= xm.ctx->module.num_instruments)
-					break;
-				graphics_draw_text(disp, 120, 120+i*10, xm.ctx->module.instruments[screen_first_inst+i].name);
-			}
+			// for (int i=0; i<11; i++) {
+			// 	if (screen_first_inst + i >= xm.ctx->module.num_instruments)
+			// 		break;
+			// 	graphics_draw_text(disp, 120, 120+i*10, xm.ctx->module.instruments[screen_first_inst+i].name);
+			// }
 		} else {
 			// Display the YM song information (author and comment).
 			sprintf(sbuf, "Author: %s", yminfo.author);
@@ -340,7 +340,7 @@ enum Page page_song(void) {
 					int patidx;
 					xm64player_tell(&xm, &patidx, NULL, NULL);
 					if (ckeys.d_left && patidx > 0) patidx--;
-					if (ckeys.d_right && patidx < xm_get_module_length(xm.ctx)-1) patidx++;
+					// if (ckeys.d_right && patidx < xm_get_module_length(xm.ctx)-1) patidx++;
 					xm64player_seek(&xm, patidx, 0, 0);
 					break;
 				} else if (song_type == SONG_YM && !ym.decoder) {
@@ -359,18 +359,18 @@ enum Page page_song(void) {
 					screen_first_inst--;
 					break;
 				}
-				if (ckeys.d_down && screen_first_inst < xm.ctx->module.num_instruments-1) {
-					screen_first_inst++;
-					break;
-				}
+				// if (ckeys.d_down && screen_first_inst < xm.ctx->module.num_instruments-1) {
+				// 	screen_first_inst++;
+				// 	break;
+				// }
 			}
 
 			if (ckeys.c_left && chselect > 0) { chselect--; break; }
 			if (ckeys.c_right && chselect < song_channels-1) { chselect++; break; }
 			if (ckeys.c_down) {
 				mute[chselect] = !mute[chselect];
-				if (song_type == SONG_XM)
-					xm_mute_channel(xm.ctx, chselect+1, mute[chselect]);
+				// if (song_type == SONG_XM)
+				// 	xm_mute_channel(xm.ctx, chselect+1, mute[chselect]);
 				break;
 			}
 			if (ckeys.c_up) { 
@@ -378,8 +378,8 @@ enum Page page_song(void) {
 				for (int i=0;i<song_channels;i++) {
 					if (i != chselect)
 						mute[i] = !mute[chselect];
-					if (song_type == SONG_XM)
-						xm_mute_channel(xm.ctx, i+1, mute[i]);
+					// if (song_type == SONG_XM)
+					// 	xm_mute_channel(xm.ctx, i+1, mute[i]);
 				}
 				break;
 			}
