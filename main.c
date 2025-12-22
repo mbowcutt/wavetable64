@@ -16,6 +16,12 @@
 
 
 ///
+/// TYPES/DEFINITIONS
+///
+typedef void (*HandlerFunc)(uint32_t*, uint32_t*);
+
+
+///
 /// GLOBAL VARIABLES
 ///
 static short * mix_buffer = NULL;
@@ -39,7 +45,7 @@ static void write_ai_buffer(short * buffer, size_t const num_samples,
                             uint32_t * phase,
                             uint32_t const tune);
 
-static inline uint32_t get_tune(unsigned int frequency);
+static inline uint32_t get_tune(uint32_t const frequency);
 
 static short interpolate_delta(int16_t const y0,
                                int16_t const y1,
@@ -48,15 +54,15 @@ static short interpolate_delta(int16_t const y0,
 static void audio_buffer_run(uint32_t * phase,
                              uint32_t const tune);
 
-static void graphics_draw(unsigned int frequency);
+static void graphics_draw(uint32_t const frequency);
 
-static void input_poll(unsigned int * frequency,
-                       uint32_t * tune);
+static HandlerFunc input_poll(void);
+
 
 /// 
 /// FUNCTION DEFINITIONS
 ///
-static inline uint32_t get_tune(unsigned int frequency)
+static inline uint32_t get_tune(uint32_t const frequency)
 {
     return (uint32_t)(((uint64_t)frequency << 32) / SAMPLE_RATE);
 }
@@ -103,10 +109,10 @@ static void write_ai_buffer(short * buffer, size_t const num_samples,
     }
 }
 
-static void graphics_draw(unsigned int frequency)
+static void graphics_draw(uint32_t const frequency)
 {
     static char str_freq[64] = {0};
-    snprintf(str_freq, 64, "Freq: %d Hz", frequency);
+    snprintf(str_freq, 64, "Freq: %lu Hz", frequency);
 
     static char str_gain[64] = {0};
     snprintf(str_gain, 64, "Gain: %2.1f", mix_gain);
@@ -130,44 +136,66 @@ static void graphics_draw(unsigned int frequency)
 	display_show(disp);
 }
 
-/// TODO: Return handler function pointer
-static void input_poll(unsigned int * frequency,
+static void pitch_up(uint32_t * frequency,
+                     uint32_t * tune)
+{
+    *frequency += 10;
+    *tune = get_tune(*frequency);
+    graphics_draw(*frequency);
+}
+
+static void pitch_down(uint32_t * frequency,
                        uint32_t * tune)
 {
+    *frequency -= 10;
+    *tune = get_tune(*frequency);
+}
+
+static void gain_up(uint32_t * frequency,
+                    uint32_t * tune)
+{
+    mix_gain += 0.1f;
+    if (mix_gain > 1.0f)
+    {
+        mix_gain = 1.0f;
+    }
+}
+
+static void gain_down(uint32_t * frequency,
+                      uint32_t * tune)
+{
+    mix_gain -= 0.1f;
+    if (mix_gain < 0.0f)
+    {
+        mix_gain = 0.0f;
+    }
+}
+
+static HandlerFunc input_poll(void)
+{
+    HandlerFunc handler = NULL;
+
     joypad_poll();
 
     joypad_buttons_t ckeys = joypad_get_buttons_pressed(JOYPAD_PORT_1);
     if (ckeys.d_left)
     {
-        *frequency -= 10;
-        *tune = get_tune(*frequency);
-        graphics_draw(*frequency);
+        handler = pitch_down;
     }
     else if (ckeys.d_right)
     {
-        *frequency += 10;
-        *tune = get_tune(*frequency);
-        graphics_draw(*frequency);
+        handler = pitch_up;
     }
     else if (ckeys.d_up)
     {
-        mix_gain += 0.1f;
-        if (mix_gain > 1.0f)
-        {
-            mix_gain = 1.0f;
-        }
-
-        graphics_draw(*frequency);
+        handler = gain_up;
     }
     else if (ckeys.d_down)
     {
-        mix_gain -= 0.1f;
-        if (mix_gain < 0.0f)
-        {
-            mix_gain = 0.0f;
-        }
-        graphics_draw(*frequency);
+        handler = gain_down;
     }
+
+    return handler;
 }
 
 static void audio_buffer_run(uint32_t * phase,
@@ -211,7 +239,7 @@ static void audio_buffer_run(uint32_t * phase,
 }
 
 int main(void) {
-    unsigned int frequency  = DEFAULT_FREQUENCY;
+    uint32_t frequency  = DEFAULT_FREQUENCY;
     uint32_t phase = 0u;
     uint32_t tune = 0u;
 
@@ -234,7 +262,12 @@ int main(void) {
     graphics_draw(frequency);
 
 	while(1) {
-        input_poll(&frequency, &tune);
+        HandlerFunc handler = input_poll();
+        if (handler)
+        {
+            handler(&frequency, &tune);
+            graphics_draw(frequency);
+        }
 
         audio_buffer_run(&phase, tune);
     }
