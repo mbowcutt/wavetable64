@@ -29,7 +29,31 @@ enum OscillatorType_e {
     NUM_OSCILLATORS
 };
 
-typedef void (*HandlerFunc)(uint32_t*, uint32_t*, enum OscillatorType_e*);
+enum EnvelopeState_e {
+    IDLE,
+    ATTACK,
+    DECAY,
+    SUSTAIN,
+    RELEASE,
+    NUM_ENVELOPE_STATES
+};
+
+struct Envelope_s
+{
+    enum EnvelopeState_e state;
+    uint32_t level;
+    uint32_t rate;
+
+    uint32_t attack_samples;
+    uint32_t decay_samples;
+    uint32_t sustain_level;
+    uint32_t release_samples;
+};
+
+typedef void (*HandlerFunc)(uint32_t * frequency,
+                            uint32_t * tune,
+                            enum OscillatorType_e * osc_type, 
+                            struct Envelope_s * envelope);
 
 
 ///
@@ -54,7 +78,8 @@ static unsigned int no_write_cnt = 0;
 static void write_ai_buffer(short * buffer, size_t const num_samples,
                             enum OscillatorType_e osc_type,
                             uint32_t * phase,
-                            uint32_t const tune);
+                            uint32_t const tune,
+                            struct Envelope_s * envelope);
 
 static inline uint32_t get_tune(uint32_t const frequency);
 
@@ -64,9 +89,12 @@ static short interpolate_delta(int16_t const y0,
 
 static void audio_buffer_run(uint32_t * phase,
                              uint32_t const tune,
-                             enum OscillatorType_e osc_type);
+                             enum OscillatorType_e osc_type,
+                             struct Envelope_s * envelope);
 
 static void graphics_draw(enum OscillatorType_e osc_type, uint32_t const frequency);
+
+static void envelope_tick(struct Envelope_s * envelope);
 
 static HandlerFunc input_poll(void);
 
@@ -137,7 +165,8 @@ static short ramp_component(uint32_t const phase)
 static void write_ai_buffer(short * buffer, size_t const num_samples,
                             enum OscillatorType_e osc_type,
                             uint32_t * phase,
-                            uint32_t const tune)
+                            uint32_t const tune,
+                            struct Envelope_s * envelope)
 {
     if (buffer && (num_samples > 0))
     {
@@ -174,6 +203,8 @@ static void write_ai_buffer(short * buffer, size_t const num_samples,
                     break;
             }
 
+            component = (short)(((int64_t)component * (int64_t)envelope->level) / UINT32_MAX);
+
             amplitude += (short)(mix_gain * component);
 
             // Write stereo samples
@@ -182,6 +213,7 @@ static void write_ai_buffer(short * buffer, size_t const num_samples,
 
             // Increment phase
             *phase += tune;
+            envelope_tick(envelope);
         }
     }
 }
@@ -235,9 +267,63 @@ static void graphics_draw(enum OscillatorType_e osc_type,
 	display_show(disp);
 }
 
+static void envelope_tick(struct Envelope_s * envelope)
+{
+    switch (envelope->state)
+    {
+        case IDLE:
+            break;
+        case ATTACK:
+            if (UINT32_MAX > envelope->level)
+            {
+                if ((UINT32_MAX - envelope->level) < envelope->rate)
+                {
+                    envelope->level = UINT32_MAX;
+                    envelope->state = DECAY;
+                }
+                else
+                {
+                    envelope->level += envelope->rate;
+                }
+            }
+            break;
+        case DECAY:
+            if (envelope->sustain_level < envelope->level)
+            {
+                envelope->level -= envelope->rate;
+                if (envelope->sustain_level >= envelope->level)
+                {
+                    envelope->level = envelope->sustain_level;
+                    envelope->state = SUSTAIN;
+                }
+            }
+            break;
+        case SUSTAIN:
+            break;
+        case RELEASE:
+            if (0 < envelope->level)
+            {
+                if ((envelope->level) < envelope->rate)
+                {
+                    envelope->level = 0;
+                    envelope->state = IDLE;
+                }
+                else
+                {
+                    envelope->level -= envelope->rate;
+                }
+            }
+            break;
+        case NUM_ENVELOPE_STATES:
+        default:
+            break;
+    }
+}
+
 static void pitch_up(uint32_t * frequency,
                      uint32_t * tune,
-                     enum OscillatorType_e * osc_type)
+                     enum OscillatorType_e * osc_type,
+                     struct Envelope_s * envelope)
 {
     *frequency += 10;
     *tune = get_tune(*frequency);
@@ -245,7 +331,8 @@ static void pitch_up(uint32_t * frequency,
 
 static void pitch_down(uint32_t * frequency,
                        uint32_t * tune,
-                       enum OscillatorType_e * osc_type)
+                       enum OscillatorType_e * osc_type,
+                       struct Envelope_s * envelope)
 {
     *frequency -= 10;
     *tune = get_tune(*frequency);
@@ -253,7 +340,8 @@ static void pitch_down(uint32_t * frequency,
 
 static void gain_up(uint32_t * frequency,
                     uint32_t * tune,
-                    enum OscillatorType_e * osc_type)
+                    enum OscillatorType_e * osc_type,
+                    struct Envelope_s * envelope)
 {
     mix_gain += 0.1f;
     if (mix_gain > 1.0f)
@@ -264,7 +352,8 @@ static void gain_up(uint32_t * frequency,
 
 static void gain_down(uint32_t * frequency,
                       uint32_t * tune,
-                      enum OscillatorType_e * osc_type)
+                      enum OscillatorType_e * osc_type,
+                      struct Envelope_s * envelope)
 {
     mix_gain -= 0.1f;
     if (mix_gain < 0.0f)
@@ -274,8 +363,9 @@ static void gain_down(uint32_t * frequency,
 }
 
 static void wave_next(uint32_t * frequency,
-                    uint32_t * tune,
-                    enum OscillatorType_e * osc_type)
+                      uint32_t * tune,
+                      enum OscillatorType_e * osc_type,
+                      struct Envelope_s * envelope)
 {
     if ((NUM_OSCILLATORS-1) == *osc_type)
     {
@@ -288,8 +378,9 @@ static void wave_next(uint32_t * frequency,
 }
 
 static void wave_prev(uint32_t * frequency,
-                    uint32_t * tune,
-                    enum OscillatorType_e * osc_type)
+                      uint32_t * tune,
+                      enum OscillatorType_e * osc_type,
+                      struct Envelope_s * envelope)
 {
     if (SINE == *osc_type)
     {
@@ -298,6 +389,27 @@ static void wave_prev(uint32_t * frequency,
     else
     {
         (*osc_type)--;
+    }
+}
+
+static void note_on(uint32_t * frequency,
+                    uint32_t * tune,
+                    enum OscillatorType_e * osc_type,
+                    struct Envelope_s * envelope)
+{
+    envelope->state = ATTACK;
+    envelope->rate = (UINT32_MAX - envelope->level) / envelope->attack_samples;
+}
+
+static void note_off(uint32_t * frequency,
+                     uint32_t * tune,
+                     enum OscillatorType_e * osc_type,
+                     struct Envelope_s * envelope)
+{
+    if (IDLE != envelope->state)
+    {   
+        envelope->state = RELEASE;
+        envelope->rate = (envelope->level - 0) / envelope->release_samples;
     }
 }
 
@@ -332,13 +444,26 @@ static HandlerFunc input_poll(void)
     {
         handler = wave_prev;
     }
+    else if (ckeys.a)
+    {
+        handler = note_on;
+    }
+    else
+    {
+        ckeys = joypad_get_buttons_released(JOYPAD_PORT_1);
+        if (ckeys.a)
+        {
+            handler = note_off;
+        }
+    }
 
     return handler;
 }
 
 static void audio_buffer_run(uint32_t * phase,
                              uint32_t const tune,
-                             enum OscillatorType_e osc_type)
+                             enum OscillatorType_e osc_type,
+                             struct Envelope_s * envelope)
 {
     if (audio_can_write()) {
 #if DEBUG_AUDIO_BUFFER_STATS
@@ -354,7 +479,8 @@ static void audio_buffer_run(uint32_t * phase,
         {
             write_ai_buffer(buffer, audio_get_buffer_length(),
                             osc_type,
-                            phase, tune);
+                            phase, tune,
+                            envelope);
         }
         audio_write_end();
     }
@@ -365,7 +491,8 @@ static void audio_buffer_run(uint32_t * phase,
 #endif
         write_ai_buffer(mix_buffer, audio_get_buffer_length(),
                         osc_type,
-                        phase, tune);
+                        phase, tune,
+                        envelope);
         mix_buffer_full = true;
     }
     else
@@ -382,6 +509,15 @@ int main(void) {
     uint32_t phase = 0u;
     uint32_t tune = 0u;
     enum OscillatorType_e osc_type = SINE;
+
+    struct Envelope_s envelope = {
+        .level = 0u,
+        .state = IDLE,
+        .attack_samples = SAMPLE_RATE,  // 1 second attack
+        .decay_samples = SAMPLE_RATE,   // 1 second decay
+        .sustain_level = 0x7FFFFFFF, // 50% sustain level
+        .release_samples = SAMPLE_RATE,  // 1 second release
+    };
 
 	joypad_init();
 	debug_init_isviewer();
@@ -410,11 +546,11 @@ int main(void) {
         HandlerFunc handler = input_poll();
         if (handler)
         {
-            handler(&frequency, &tune, &osc_type);
+            handler(&frequency, &tune, &osc_type, &envelope);
             graphics_draw(osc_type, frequency);
         }
 
-        audio_buffer_run(&phase, tune, osc_type);
+        audio_buffer_run(&phase, tune, osc_type, &envelope);
     }
 
     if (mix_buffer) free(mix_buffer);
