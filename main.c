@@ -85,7 +85,7 @@ static short interpolate_delta(int16_t const y0,
     // Worst case: UINT16_MAX * (+/-)UINT16_MAX = (+/-)UINT32_MAX
     // delta * frac product casted to int64_t
 
-    return (short) (((int64_t)(y1 - y0) * (int64_t)frac) / UINT16_MAX); 
+    return (short) (((int64_t)((int32_t)(y1 - y0) * (int32_t)frac)) >> 16);
 }
 
 static void write_ai_buffer(short * buffer, size_t num_samples,
@@ -98,13 +98,13 @@ static void write_ai_buffer(short * buffer, size_t num_samples,
     {
         for (size_t i = 0; i < (2 * num_samples); i+=2)
         {
-            unsigned int next_wav_pos = (*wav_pos_int + 1) % SINE_LUT_SIZE;
-            short const y0 = sine_lut[*wav_pos_int];
+            unsigned int const next_wav_pos = (*wav_pos_int + 1) % SINE_LUT_SIZE;
+            short y0 = sine_lut[*wav_pos_int];
             short const y1 = sine_lut[next_wav_pos];
-            short const val = mix_gain * (y0 + interpolate_delta(y0, y1, *wav_pos_frac));
+            y0 = mix_gain * (y0 + interpolate_delta(y0, y1, *wav_pos_frac));
 
-            buffer[i] = val;
-            buffer[i+1] = val;  
+            buffer[i] = y0;
+            buffer[i+1] = y0;  
 
             if ((UINT16_MAX - *wav_pos_frac) <= wav_step_frac)
             {
@@ -130,6 +130,9 @@ static void graphics_draw(unsigned int frequency)
     static char str_freq[64] = {0};
     snprintf(str_freq, 64, "Freq: %d Hz", frequency);
 
+    static char str_gain[64] = {0};
+    snprintf(str_gain, 64, "Gain: %2.1f", mix_gain);
+
 #if DEBUG_AUDIO_BUFFER_STATS
     static char str_dbg_audio_buf_stats[64] = {0};
     snprintf(str_dbg_audio_buf_stats, 64, "Write cnt: %u\nLocal write cnt:%u\nNo write cnt: %u",
@@ -138,12 +141,13 @@ static void graphics_draw(unsigned int frequency)
 
     display_context_t disp = display_get();
 	graphics_fill_screen(disp, 0);
-    graphics_draw_text(disp, 30, 10, "N64 Wavetable Synthesizer - v0.1\t(c) Michael Bowcutt");
+    graphics_draw_text(disp, 30, 10, "N64 Wavetable Synthesizer\t\t\t\t\tv0.1");
 	graphics_draw_text(disp, 30, 20, "(c) 2025 Michael Bowcutt");
 	graphics_draw_text(disp, 30, 50, "Wave: Sine");
     graphics_draw_text(disp, 30, 58, str_freq);
+    graphics_draw_text(disp, 30, 66, str_gain);
 #if DEBUG_AUDIO_BUFFER_STATS
-    graphics_draw_text(disp, 30, 66, str_dbg_audio_buf_stats);
+    graphics_draw_text(disp, 30, 74, str_dbg_audio_buf_stats);
 #endif
 	display_show(disp);
 }
