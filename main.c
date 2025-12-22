@@ -1,6 +1,8 @@
 #include <libdragon.h>
 #include <audio.h>
+#include <console.h>
 #include <stdio.h>
+
 
 #include "sine_lut.h"
 
@@ -13,6 +15,7 @@
 #define DEFAULT_FREQUENCY 440u
 
 #define DEBUG_AUDIO_BUFFER_STATS 0
+#define DEBUG_CONSOLE 0
 
 
 ///
@@ -102,6 +105,35 @@ static short sine_component(uint32_t const phase)
     return y0 + interpolate_delta(y0, y1, phase_frac);
 }
 
+static short triangle_component(uint32_t const phase)
+{
+    uint32_t phase_temp = phase + 0x40000000;
+    phase_temp >>= 15;
+    if (phase_temp & 0x10000)
+    {
+        phase_temp = 0x1FFFF - phase_temp;
+    }
+    return (short)(phase_temp - 0x8000);
+}
+
+static short square_component(uint32_t const phase)
+{
+    if (phase & 0x80000000)
+    {
+        return INT16_MIN;
+    }
+    else
+    {
+        return INT16_MAX;
+    }
+}
+
+static short ramp_component(uint32_t const phase)
+{
+    return (short)((phase) >> 16);
+}
+
+
 static void write_ai_buffer(short * buffer, size_t const num_samples,
                             enum OscillatorType_e osc_type,
                             uint32_t * phase,
@@ -124,17 +156,17 @@ static void write_ai_buffer(short * buffer, size_t const num_samples,
                 }
                 case TRIANGLE:
                 {
-                    /// TODO
+                    component = triangle_component(*phase);
                     break;
                 }
                 case SQUARE:
                 {
-                    /// TODO
+                    component = square_component(*phase);
                     break;
                 }
                 case RAMP:
                 {
-                    /// TODO
+                    component = ramp_component(*phase);
                     break;
                 }
                 case NUM_OSCILLATORS:
@@ -356,6 +388,11 @@ int main(void) {
 	debug_init_usblog();
 
 	display_init(RESOLUTION_512x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
+
+#if DEBUG_CONSOLE
+    console_init();
+    console_set_render_mode(RENDER_AUTOMATIC);
+#endif
 
 	audio_init(SAMPLE_RATE, NUM_AUDIO_BUFFERS);
     tune = get_tune(frequency);
