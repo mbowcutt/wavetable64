@@ -1,11 +1,9 @@
 #include <libdragon.h>
 #include <audio.h>
 #include <console.h>
+
+#include <math.h>
 #include <stdio.h>
-
-
-#include "sine_lut.h"
-
 
 ///
 /// COMPILER CONSTANTS/DEFINITIONS
@@ -65,6 +63,8 @@ static size_t mix_buffer_len = 0;
 
 static float mix_gain = 0.5f;
 
+const short * sine_lut = NULL;
+
 #if DEBUG_AUDIO_BUFFER_STATS
 static unsigned int write_cnt = 0;
 static unsigned int local_write_cnt = 0;
@@ -98,10 +98,27 @@ static void envelope_tick(struct Envelope_s * envelope);
 
 static HandlerFunc input_poll(void);
 
+static short * generate_sine_lut(size_t lut_size);
+
 
 /// 
 /// FUNCTION DEFINITIONS
 ///
+static short * generate_sine_lut(size_t lut_size)
+{
+    short * lut = malloc(lut_size * sizeof(short));
+    if (!lut) return NULL;
+
+    float const phase_step = (2.0f * M_PI) / (float)lut_size;
+
+    for (size_t i = 0; i < lut_size; ++i)
+    {
+        lut[i] = (short)(INT16_MAX * sinf((float)i * phase_step));
+    }
+
+    return lut;
+}
+
 static inline uint32_t get_tune(uint32_t const frequency)
 {
     return (uint32_t)(((uint64_t)frequency << 32) / SAMPLE_RATE);
@@ -236,6 +253,30 @@ static char * get_osc_type_str(enum OscillatorType_e osc_type)
     }
 }
 
+static void draw_splash_loading(void)
+{
+    display_context_t disp = display_get();
+    graphics_fill_screen(disp, 0);
+    graphics_draw_text(disp, 60, 60, "N64 Wavetable Synthesizer\t\t\t\t\tv0.1");
+    graphics_draw_text(disp, 60, 68, "(c) 2025 Michael Bowcutt");
+    graphics_draw_text(disp, 60, 82, "Loading...");
+    display_show(disp);
+}
+
+static void draw_splash_ready(void)
+{
+    display_context_t disp = display_get();
+    graphics_fill_screen(disp, 0);
+    graphics_draw_text(disp, 60, 60, "N64 Wavetable Synthesizer\t\t\t\t\tv0.1");
+    graphics_draw_text(disp, 60, 68, "(c) 2025 Michael Bowcutt");
+    graphics_draw_text(disp, 60, 82, "Press Start");
+    display_show(disp);
+
+    do {
+        joypad_poll();
+    } while (!joypad_get_buttons_pressed(JOYPAD_PORT_1).start);
+}
+
 static void graphics_draw(enum OscillatorType_e osc_type,
                           uint32_t const frequency)
 {
@@ -257,7 +298,7 @@ static void graphics_draw(enum OscillatorType_e osc_type,
     display_context_t disp = display_get();
 	graphics_fill_screen(disp, 0);
     graphics_draw_text(disp, 30, 10, "N64 Wavetable Synthesizer\t\t\t\t\tv0.1");
-	graphics_draw_text(disp, 30, 20, "(c) 2025 Michael Bowcutt");
+	graphics_draw_text(disp, 30, 18, "(c) 2025 Michael Bowcutt");
 	graphics_draw_text(disp, 30, 50, str_osc);
     graphics_draw_text(disp, 30, 58, str_freq);
     graphics_draw_text(disp, 30, 66, str_gain);
@@ -519,11 +560,15 @@ int main(void) {
         .release_samples = SAMPLE_RATE,  // 1 second release
     };
 
-	joypad_init();
+	display_init(RESOLUTION_512x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
+    draw_splash_loading();
+
+    joypad_init();
 	debug_init_isviewer();
 	debug_init_usblog();
 
-	display_init(RESOLUTION_512x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
+    sine_lut = generate_sine_lut(65536);
+    if (!sine_lut) return -1;
 
 #if DEBUG_CONSOLE
     console_init();
@@ -540,6 +585,7 @@ int main(void) {
         return -1;
     }
 
+    draw_splash_ready();
     graphics_draw(osc_type, frequency);
 
 	while(1) {
