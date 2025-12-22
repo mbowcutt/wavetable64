@@ -34,43 +34,31 @@ static unsigned int no_write_cnt = 0;
 ///
 /// STATIC PROTOTYPES
 ///
-static void write_ai_buffer(short * buffer, size_t num_samples,
-                            unsigned int * wav_pos_int,
-                            unsigned int const wav_step_int,
-                            uint16_t * wav_pos_frac,
-                            uint16_t const wav_step_frac);
+static void write_ai_buffer(short * buffer, size_t const num_samples,
+                            short const * amp_lut, size_t const amp_lut_len,
+                            uint32_t * phase,
+                            uint32_t const tune);
 
-static void calculate_wavetable_step(unsigned int const frequency,
-                                     unsigned int * step_int,
-                                     uint16_t * step_frac);
+static inline uint32_t get_tune(unsigned int frequency);
 
 static short interpolate_delta(int16_t const y0,
                                int16_t const y1,
                                uint16_t const frac);
 
-static void audio_buffer_run(unsigned int * wav_pos_int,
-                             unsigned int const wav_step_int,
-                             uint16_t * wav_pos_frac,
-                             uint16_t const wav_step_frac);
+static void audio_buffer_run(uint32_t * phase,
+                             uint32_t const tune);
 
 static void graphics_draw(unsigned int frequency);
 
 static void input_poll(unsigned int * frequency,
-                       unsigned int * wav_step_int,
-                       uint16_t * wav_step_frac);
-
+                       uint32_t * tune);
 
 /// 
 /// FUNCTION DEFINITIONS
 ///
-static void calculate_wavetable_step(unsigned int frequency,
-                                     unsigned int * step_int,
-                                     uint16_t * step_frac)
+static inline uint32_t get_tune(unsigned int frequency)
 {
-    *step_int = (frequency * SINE_LUT_SIZE) / SAMPLE_RATE;
-    *step_frac = (*step_int * frequency * UINT16_MAX) / frequency;
-
-    graphics_draw(frequency);
+    return (uint32_t)(((uint64_t)frequency << 32) / SAMPLE_RATE);
 }
 
 static short interpolate_delta(int16_t const y0,
@@ -88,39 +76,29 @@ static short interpolate_delta(int16_t const y0,
     return (short) (((int64_t)((int32_t)(y1 - y0) * (int32_t)frac)) >> 16);
 }
 
-static void write_ai_buffer(short * buffer, size_t num_samples,
-                            unsigned int * wav_pos_int,
-                            unsigned int const wav_step_int,
-                            uint16_t * wav_pos_frac,
-                            uint16_t const wav_step_frac)
+static void write_ai_buffer(short * buffer, size_t const num_samples,
+                            short const * amp_lut, size_t const amp_lut_len,
+                            uint32_t * phase,
+                            uint32_t const tune)
 {
     if (buffer && (num_samples > 0))
     {
         for (size_t i = 0; i < (2 * num_samples); i+=2)
         {
-            unsigned int const next_wav_pos = (*wav_pos_int + 1) % SINE_LUT_SIZE;
-            short y0 = sine_lut[*wav_pos_int];
-            short const y1 = sine_lut[next_wav_pos];
-            y0 = mix_gain * (y0 + interpolate_delta(y0, y1, *wav_pos_frac));
+            uint16_t const phase_int = (uint16_t const)((*phase) >> 16);
+            uint16_t const phase_frac = (uint16_t const)*phase;
 
+            // Phase to amplitude lookup
+            short y0 = amp_lut[phase_int];
+            short const y1 = amp_lut[phase_int + 1];
+            y0 = mix_gain * (y0 + interpolate_delta(y0, y1, phase_frac));
+
+            // Write stereo samples
             buffer[i] = y0;
             buffer[i+1] = y0;  
 
-            if ((UINT16_MAX - *wav_pos_frac) <= wav_step_frac)
-            {
-                *wav_pos_int = next_wav_pos;
-                *wav_pos_frac = wav_step_frac - (UINT16_MAX - *wav_pos_frac);
-            }
-            else
-            {
-                *wav_pos_frac += wav_step_frac;
-            }
-
-            *wav_pos_int += wav_step_int;
-            if (*wav_pos_int >= SINE_LUT_SIZE)
-            {
-                *wav_pos_int -= SINE_LUT_SIZE;
-            }
+            // Increment phase
+            *phase += tune;
         }
     }
 }
@@ -154,8 +132,7 @@ static void graphics_draw(unsigned int frequency)
 
 /// TODO: Return handler function pointer
 static void input_poll(unsigned int * frequency,
-                       unsigned int * wav_step_int,
-                       uint16_t * wav_step_frac)
+                       uint32_t * tune)
 {
     joypad_poll();
 
@@ -163,12 +140,14 @@ static void input_poll(unsigned int * frequency,
     if (ckeys.d_left)
     {
         *frequency -= 10;
-        calculate_wavetable_step(*frequency, wav_step_int, wav_step_frac);
+        *tune = get_tune(*frequency);
+        graphics_draw(*frequency);
     }
     else if (ckeys.d_right)
     {
         *frequency += 10;
-        calculate_wavetable_step(*frequency, wav_step_int, wav_step_frac);
+        *tune = get_tune(*frequency);
+        graphics_draw(*frequency);
     }
     else if (ckeys.d_up)
     {
@@ -191,10 +170,8 @@ static void input_poll(unsigned int * frequency,
     }
 }
 
-static void audio_buffer_run(unsigned int * wav_pos_int,
-                             unsigned int const wav_step_int,
-                             uint16_t * wav_pos_frac,
-                             uint16_t const wav_step_frac)
+static void audio_buffer_run(uint32_t * phase,
+                             uint32_t const tune)
 {
     if (audio_can_write()) {
 #if DEBUG_AUDIO_BUFFER_STATS
@@ -209,8 +186,8 @@ static void audio_buffer_run(unsigned int * wav_pos_int,
         else
         {
             write_ai_buffer(buffer, audio_get_buffer_length(),
-                            wav_pos_int, wav_step_int,
-                            wav_pos_frac, wav_step_frac);
+                            sine_lut, UINT16_MAX,
+                            phase, tune);
         }
         audio_write_end();
     }
@@ -220,8 +197,8 @@ static void audio_buffer_run(unsigned int * wav_pos_int,
         ++local_write_cnt;
 #endif
         write_ai_buffer(mix_buffer, audio_get_buffer_length(),
-                        wav_pos_int, wav_step_int,
-                        wav_pos_frac, wav_step_frac);
+                        sine_lut, UINT16_MAX,
+                        phase, tune);
         mix_buffer_full = true;
     }
     else
@@ -235,10 +212,8 @@ static void audio_buffer_run(unsigned int * wav_pos_int,
 
 int main(void) {
     unsigned int frequency  = DEFAULT_FREQUENCY;
-    unsigned int wav_pos_int = 0;
-    uint16_t wav_pos_frac = 0;
-    unsigned int wav_step_int = 0;
-    uint16_t wav_step_frac = 0;
+    uint32_t phase = 0u;
+    uint32_t tune = 0u;
 
 	joypad_init();
 	debug_init_isviewer();
@@ -247,7 +222,7 @@ int main(void) {
 	display_init(RESOLUTION_512x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
 
 	audio_init(SAMPLE_RATE, NUM_AUDIO_BUFFERS);
-    calculate_wavetable_step(frequency, &wav_step_int, &wav_step_frac);
+    tune = get_tune(frequency);
 
     mix_buffer_len = 2 * audio_get_buffer_length() * sizeof(short);
     mix_buffer = malloc(mix_buffer_len);
@@ -259,10 +234,9 @@ int main(void) {
     graphics_draw(frequency);
 
 	while(1) {
-        
-        input_poll(&frequency, &wav_step_int, &wav_step_frac);
+        input_poll(&frequency, &tune);
 
-        audio_buffer_run(&wav_pos_int, wav_step_int, &wav_pos_frac, wav_step_frac);
+        audio_buffer_run(&phase, tune);
     }
 
     if (mix_buffer) free(mix_buffer);
