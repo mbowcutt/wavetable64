@@ -14,12 +14,24 @@
 #define DEFAULT_FREQUENCY 440u
 
 #define DEBUG_AUDIO_BUFFER_STATS 0
-#define DEBUG_CONSOLE 1
+#define DEBUG_CONSOLE 0
 
 
 ///
 /// TYPES/DEFINITIONS
 ///
+enum InitState_e
+{
+    INIT,
+    GEN_SINE,
+    GEN_SQUARE,
+    GEN_TRIANGLE,
+    GEN_RAMP,
+    ALLOC_MIX_BUF,
+    INIT_AUDIO,
+    COMPLETE,
+};
+
 enum OscillatorType_e {
     SINE,
     TRIANGLE,
@@ -95,39 +107,55 @@ static void audio_buffer_run(uint32_t * phase,
                              short * wave_table,
                              struct Envelope_s * envelope);
 
+static void draw_splash(enum InitState_e init_state);
 static void graphics_draw(enum OscillatorType_e osc_type, uint32_t const frequency);
 
 static void envelope_tick(struct Envelope_s * envelope);
 
 static HandlerFunc input_poll(void);
 
-static short * generate_sine_lut(void);
-static short * generate_square_lut(size_t num_harmonics);
-static short * generate_triangle_lut(size_t num_harmonics);
-static short * generate_ramp_lut(size_t num_harmonics);
+static void rms_normalize(short * lut, float * temp_lut, float target_rms, float sum_squares);
+static short * generate_sine_lut(float * sum_squares);
+static short * generate_square_lut(float target_rms, size_t num_harmonics);
+static short * generate_triangle_lut(float target_rms, size_t num_harmonics);
+static short * generate_ramp_lut(float target_rms, size_t num_harmonics);
 
 
 /// 
 /// FUNCTION DEFINITIONS
 ///
-static short * generate_sine_lut(void)
+static void rms_normalize(short * lut, float * temp_lut, float target_rms, float sum_squares)
+{
+    float const rms = sqrtf(sum_squares / WAVE_TABLE_SIZE);
+    float const scale = target_rms / rms;
+
+    printf("Target: %f, RMS: %f, scale: %f\n", target_rms, rms, scale);
+
+    for (size_t i = 0; i < WAVE_TABLE_SIZE; ++i)
+    {
+        lut[i] = (short)(INT16_MAX * temp_lut[i] * scale);
+    }
+}
+
+static short * generate_sine_lut(float * sum_squares)
 {
     short * lut = malloc(WAVE_TABLE_SIZE * sizeof(short));
     if (!lut) return NULL;
-
-    short max_amplitude = INT16_MAX / 2;
 
     float const phase_step = (2.0f * M_PI) / WAVE_TABLE_SIZE;
 
     for (size_t i = 0; i < WAVE_TABLE_SIZE; ++i)
     {
-        lut[i] = (short)(max_amplitude * sinf((float)i * phase_step));
+        float temp = sinf((float)i * phase_step);
+        (*sum_squares) += temp * temp;
+
+        lut[i] = (short)(INT16_MAX/2 * temp);
     }
 
     return lut;
 }
 
-static short * generate_square_lut(size_t num_harmonics)
+static short * generate_square_lut(float target_rms, size_t num_harmonics)
 {
     short * lut = malloc(WAVE_TABLE_SIZE * sizeof(short));
     if (!lut) return NULL;
@@ -148,22 +176,13 @@ static short * generate_square_lut(size_t num_harmonics)
         sum_squares += temp_lut[i] * temp_lut[i];
     }
 
-    float rms = sqrtf(sum_squares / WAVE_TABLE_SIZE);
-    float scale = target_rms / rms;
-
-    printf("Target: %f, RMS: %f, scale: %f\n", target_rms, rms, scale);
-
-    for (size_t i = 0; i < WAVE_TABLE_SIZE; ++i)
-    {
-        lut[i] = (short)(temp_lut[i] * scale * INT16_MAX);
-    }
-
+    rms_normalize(lut, temp_lut, target_rms, sum_squares);
     free(temp_lut);
 
     return lut;
 }
 
-static short * generate_triangle_lut(size_t num_harmonics)
+static short * generate_triangle_lut(float target_rms, size_t num_harmonics)
 {
     short * lut = malloc(WAVE_TABLE_SIZE * sizeof(short));
     if (!lut) return NULL;
@@ -186,22 +205,13 @@ static short * generate_triangle_lut(size_t num_harmonics)
         sum_squares += temp_lut[i] * temp_lut[i];
     }
 
-    float rms = sqrtf(sum_squares / WAVE_TABLE_SIZE);
-    float scale = target_rms / rms;
-
-    printf("Target: %f, RMS: %f, scale: %f\n", target_rms, rms, scale);
-
-    for (size_t i = 0; i < WAVE_TABLE_SIZE; ++i)
-    {
-        lut[i] = (short)(temp_lut[i] * scale * INT16_MAX);
-    }
-
+    rms_normalize(lut, temp_lut, target_rms, sum_squares);
     free(temp_lut);
 
     return lut;
 }
 
-static short * generate_ramp_lut(size_t num_harmonics)
+static short * generate_ramp_lut(float target_rms, size_t num_harmonics)
 {
     short * lut = malloc(WAVE_TABLE_SIZE * sizeof(short));
     if (!lut) return NULL;
@@ -222,16 +232,7 @@ static short * generate_ramp_lut(size_t num_harmonics)
         sum_squares += temp_lut[i] * temp_lut[i];
     }
 
-    float rms = sqrtf(sum_squares / WAVE_TABLE_SIZE);
-    float scale = target_rms / rms;
-
-    printf("Target: %f, RMS: %f, scale: %f\n", target_rms, rms, scale);
-
-    for (size_t i = 0; i < WAVE_TABLE_SIZE; ++i)
-    {
-        lut[i] = (short)(temp_lut[i] * scale * INT16_MAX);
-    }
-
+    rms_normalize(lut, temp_lut, target_rms, sum_squares);
     free(temp_lut);
 
     return lut;
@@ -345,29 +346,82 @@ static char * get_osc_type_str(enum OscillatorType_e osc_type)
     }
 }
 
-static void draw_splash_loading(void)
+static void draw_splash(enum InitState_e init_state)
 {
     display_context_t disp = display_get();
     graphics_fill_screen(disp, 0);
-    graphics_draw_text(disp, 60, 60, "N64 Wavetable Synthesizer\t\t\t\t\tv0.1");
-    graphics_draw_text(disp, 60, 68, "(c) 2025 Michael Bowcutt");
-    graphics_draw_text(disp, 60, 82, "Loading...");
+    graphics_draw_text(disp, 30, 10, "N64 Wavetable Synthesizer\t\t\t\t\tv0.1");
+    graphics_draw_text(disp, 30, 18, "(c) 2025 Michael Bowcutt");
+
+    if (GEN_SINE == init_state)
+    {
+        graphics_draw_text(disp, 60, 76, "Generating sine wave...");
+    }
+    else if (GEN_SINE < init_state)
+    {
+        graphics_draw_text(disp, 60, 76, "Sine wave generated.");
+    }
+
+    if (GEN_SQUARE == init_state)
+    {
+        graphics_draw_text(disp, 60, 84, "Generating square wave...");
+    }
+    else if (GEN_SQUARE < init_state)
+    {
+        graphics_draw_text(disp, 60, 84, "Sqare wave generated.");
+    }
+
+    if (GEN_TRIANGLE == init_state)
+    {
+        graphics_draw_text(disp, 60, 92, "Generating triangle wave...");
+    }
+    else if (GEN_TRIANGLE < init_state)
+    {
+        graphics_draw_text(disp, 60, 92, "Triangle wave generated.");
+    }
+
+    if (GEN_RAMP == init_state)
+    {
+        graphics_draw_text(disp, 60, 100, "Generating ramp wave...");
+    }
+    else if (GEN_RAMP < init_state)
+    {
+        graphics_draw_text(disp, 60, 100, "Ramp wave generated.");
+    }
+
+    if (ALLOC_MIX_BUF == init_state)
+    {
+        graphics_draw_text(disp, 60, 108, "Allocating mix buffer...");
+    }
+    else if (ALLOC_MIX_BUF < init_state)
+    {
+        graphics_draw_text(disp, 60, 108, "Mix buffer allocated.");
+    }
+
+    if (INIT_AUDIO == init_state)
+    {
+        graphics_draw_text(disp, 60, 116, "Initializing audio subsystem...");
+    }
+    else if (INIT_AUDIO < init_state)
+    {
+        graphics_draw_text(disp, 60, 116, "Audio subsystem initialized.");
+    }
+
+    if (COMPLETE == init_state)
+    {
+        graphics_draw_text(disp, 60, 124, "Ready... Press Start");
+    }
+
     display_show(disp);
+
+    if (COMPLETE == init_state)
+    {
+        do {
+            joypad_poll();
+        } while (!joypad_get_buttons_pressed(JOYPAD_PORT_1).start);
+    }
 }
 
-static void draw_splash_ready(void)
-{
-    display_context_t disp = display_get();
-    graphics_fill_screen(disp, 0);
-    graphics_draw_text(disp, 60, 60, "N64 Wavetable Synthesizer\t\t\t\t\tv0.1");
-    graphics_draw_text(disp, 60, 68, "(c) 2025 Michael Bowcutt");
-    graphics_draw_text(disp, 60, 82, "Press Start");
-    display_show(disp);
-
-    do {
-        joypad_poll();
-    } while (!joypad_get_buttons_pressed(JOYPAD_PORT_1).start);
-}
 
 static void graphics_draw(enum OscillatorType_e osc_type,
                           uint32_t const frequency)
@@ -634,7 +688,56 @@ static void audio_buffer_run(uint32_t * phase,
         ++no_write_cnt;
 #endif
     }
-        
+}
+
+static bool generate_wave_tables(void)
+{
+    bool status = true;
+    float sum_squares = 0;
+
+    draw_splash(GEN_SINE);
+    osc_wave_tables[SINE] = generate_sine_lut(&sum_squares);
+    if (!osc_wave_tables[SINE])
+    {
+        status = false;
+    }
+    else
+    {
+        target_rms = 0.5f * sqrtf(sum_squares/WAVE_TABLE_SIZE);
+    }
+
+    size_t const num_harmonics = 120;
+    if (status)
+    {
+        draw_splash(GEN_SQUARE);
+        osc_wave_tables[SQUARE] = generate_square_lut(target_rms, num_harmonics);
+        if (!osc_wave_tables[SQUARE])
+        {
+            status = false;
+        }
+    }
+
+    if (status)
+    {
+        draw_splash(GEN_TRIANGLE);
+        osc_wave_tables[TRIANGLE] = generate_triangle_lut(target_rms, num_harmonics);
+        if (!osc_wave_tables[TRIANGLE])
+        {
+            status = false;
+        }
+    }
+
+    if (status)
+    {
+        draw_splash(GEN_RAMP);
+        osc_wave_tables[RAMP] = generate_ramp_lut(target_rms, num_harmonics);
+        if (!osc_wave_tables[RAMP])
+        {
+            status = false;
+        }
+    }
+
+    return status;
 }
 
 int main(void) {
@@ -654,7 +757,7 @@ int main(void) {
 
 
 	display_init(RESOLUTION_512x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
-    draw_splash_loading();
+    draw_splash(INIT);
 
     joypad_init();
 	debug_init_isviewer();
@@ -665,28 +768,16 @@ int main(void) {
     console_set_render_mode(RENDER_AUTOMATIC);
 #endif
 
-    target_rms = sqrtf(2.0f) / 4;
+    if (!generate_wave_tables())
+    {
+        return -1;
+    }
 
-    osc_wave_tables[SINE] = generate_sine_lut();
-    if (!osc_wave_tables[SINE]) return -1;
-    else printf("Sine generated\n");
-
-    size_t const num_harmonics = 60;
-    osc_wave_tables[SQUARE] = generate_square_lut(num_harmonics);
-    if (!osc_wave_tables[SQUARE]) return -1;
-    else printf("Square generated\n");
-
-    osc_wave_tables[TRIANGLE] = generate_triangle_lut(num_harmonics);
-    if (!osc_wave_tables[TRIANGLE]) return -1;
-    else printf("Triangle generated\n");
-
-    osc_wave_tables[RAMP] = generate_ramp_lut(num_harmonics);
-    if (!osc_wave_tables[RAMP]) return -1;
-    else printf("Ramp generated\n");
-
+    draw_splash(INIT_AUDIO);
 	audio_init(SAMPLE_RATE, NUM_AUDIO_BUFFERS);
     tune = get_tune(frequency);
 
+    draw_splash(ALLOC_MIX_BUF);
     mix_buffer_len = 2 * audio_get_buffer_length() * sizeof(short);
     mix_buffer = malloc(mix_buffer_len);
     if (!mix_buffer)
@@ -694,7 +785,7 @@ int main(void) {
         return -1;
     }
 
-    draw_splash_ready();
+    draw_splash(COMPLETE);
     graphics_draw(osc_type, frequency);
 
 	while(1) {
