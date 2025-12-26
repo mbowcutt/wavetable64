@@ -14,7 +14,8 @@
 #define ACCUMULATOR_BITS 32
 #define FRAC_BITS (ACCUMULATOR_BITS - WT_BIT_DEPTH)
 #define NUM_AUDIO_BUFFERS 4
-#define DEFAULT_FREQUENCY 440u
+#define DEFAULT_NOTE 69 // Middle A (440Hz)
+#define NUM_NOTES 128
 
 #define DEBUG_AUDIO_BUFFER_STATS 0
 #define DEBUG_CONSOLE 0
@@ -30,6 +31,7 @@ enum InitState_e
     GEN_SQUARE,
     GEN_TRIANGLE,
     GEN_RAMP,
+    GEN_FREQ_TBL,
     ALLOC_MIX_BUF,
     INIT_AUDIO,
     COMPLETE,
@@ -64,9 +66,9 @@ struct Envelope_s
     uint32_t release_samples;
 };
 
-typedef void (*HandlerFunc)(uint32_t * frequency,
+typedef void (*HandlerFunc)(uint8_t * note,
                             uint32_t * tune,
-                            enum OscillatorType_e *  osc_type, 
+                            enum OscillatorType_e *  osc_type,
                             struct Envelope_s * envelope);
 
 
@@ -81,6 +83,8 @@ static float mix_gain = 0.5f;
 
 static short * osc_wave_tables[NUM_OSCILLATORS];
 
+static float midi_freq_lut[NUM_NOTES];
+
 static float target_rms = 0;
 
 #if DEBUG_AUDIO_BUFFER_STATS
@@ -88,6 +92,10 @@ static unsigned int write_cnt = 0;
 static unsigned int local_write_cnt = 0;
 static unsigned int no_write_cnt = 0;
 #endif
+
+static const char* note_names[] = {
+    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
+};
 
 
 ///
@@ -99,7 +107,7 @@ static void write_ai_buffer(short * buffer, size_t const num_samples,
                             uint32_t const tune,
                             struct Envelope_s * envelope);
 
-static inline uint32_t get_tune(uint32_t const frequency);
+static inline uint32_t get_tune(uint8_t const note);
 
 static short interpolate_delta(int16_t const y0,
                                int16_t const y1,
@@ -111,13 +119,18 @@ static void audio_buffer_run(uint32_t * phase,
                              struct Envelope_s * envelope);
 
 static void draw_splash(enum InitState_e init_state);
-static void graphics_draw(enum OscillatorType_e osc_type, uint32_t const frequency);
+static void graphics_draw(enum OscillatorType_e osc_type, uint8_t const note);
+
+static char * get_osc_type_str(enum OscillatorType_e const osc_type);
 
 static void envelope_tick(struct Envelope_s * envelope);
 
 static HandlerFunc input_poll(void);
 
 static void rms_normalize(short * lut, float * temp_lut, float target_rms, float sum_squares);
+
+static void generate_midi_freq_tbl(void);
+static bool generate_wave_tables(void);
 static short * generate_sine_lut(float * sum_squares);
 static short * generate_square_lut(float target_rms, size_t num_harmonics);
 static short * generate_triangle_lut(float target_rms, size_t num_harmonics);
@@ -129,7 +142,7 @@ static short * generate_ramp_lut(float target_rms, size_t num_harmonics);
 // static short ramp_component(uint32_t const phase);
 
 
-/// 
+///
 /// FUNCTION DEFINITIONS
 ///
 static void rms_normalize(short * lut, float * temp_lut, float target_rms, float sum_squares)
@@ -250,9 +263,9 @@ static short * generate_ramp_lut(float target_rms, size_t num_harmonics)
     return lut;
 }
 
-static inline uint32_t get_tune(uint32_t const frequency)
+static inline uint32_t get_tune(uint8_t const note)
 {
-    return (uint32_t)(((uint64_t)frequency << 32) / SAMPLE_RATE);
+    return (uint32_t)((midi_freq_lut[note] * ((uint64_t)1 << ACCUMULATOR_BITS)) / SAMPLE_RATE);
 }
 
 static short interpolate_delta(int16_t const y0,
@@ -333,7 +346,7 @@ static void write_ai_buffer(short * buffer, size_t const num_samples,
     }
 }
 
-static char * get_osc_type_str(enum OscillatorType_e osc_type)
+static char * get_osc_type_str(enum OscillatorType_e const osc_type)
 {
     switch (osc_type)
     {
@@ -394,27 +407,36 @@ static void draw_splash(enum InitState_e init_state)
         graphics_draw_text(disp, 60, 100, "Ramp wave generated.");
     }
 
+    if (GEN_FREQ_TBL == init_state)
+    {
+        graphics_draw_text(disp, 60, 108, "Generating MIDI note frequency LUT...");
+    }
+    else if (GEN_FREQ_TBL < init_state)
+    {
+        graphics_draw_text(disp, 60, 108, "MIDI note frequency LUT generated.");
+    }
+
     if (ALLOC_MIX_BUF == init_state)
     {
-        graphics_draw_text(disp, 60, 108, "Allocating mix buffer...");
+        graphics_draw_text(disp, 60, 116, "Allocating mix buffer...");
     }
     else if (ALLOC_MIX_BUF < init_state)
     {
-        graphics_draw_text(disp, 60, 108, "Mix buffer allocated.");
+        graphics_draw_text(disp, 60, 116, "Mix buffer allocated.");
     }
 
     if (INIT_AUDIO == init_state)
     {
-        graphics_draw_text(disp, 60, 116, "Initializing audio subsystem...");
+        graphics_draw_text(disp, 60, 124, "Initializing audio subsystem...");
     }
     else if (INIT_AUDIO < init_state)
     {
-        graphics_draw_text(disp, 60, 116, "Audio subsystem initialized.");
+        graphics_draw_text(disp, 60, 124, "Audio subsystem initialized.");
     }
 
     if (COMPLETE == init_state)
     {
-        graphics_draw_text(disp, 60, 124, "Ready... Press Start");
+        graphics_draw_text(disp, 60, 132, "Ready... Press Start");
     }
 
     display_show(disp);
@@ -429,13 +451,16 @@ static void draw_splash(enum InitState_e init_state)
 
 
 static void graphics_draw(enum OscillatorType_e osc_type,
-                          uint32_t const frequency)
+                          uint8_t const note)
 {
     static char str_osc[64] = {0};
     snprintf(str_osc, 64, "Oscillator: %s", get_osc_type_str(osc_type));
 
     static char str_freq[64] = {0};
-    snprintf(str_freq, 64, "Freq: %lu Hz", frequency);
+    snprintf(str_freq, 64, "MIDI note: %s%d (%u) - %f Hz",
+             note_names[note % 12],
+             (note / 12) - 1,
+             note, midi_freq_lut[note]);
 
     static char str_gain[64] = {0};
     snprintf(str_gain, 64, "Gain: %2.1f", mix_gain);
@@ -512,25 +537,25 @@ static void envelope_tick(struct Envelope_s * envelope)
     }
 }
 
-static void pitch_up(uint32_t * frequency,
+static void pitch_up(uint8_t * note,
                      uint32_t * tune,
                      enum OscillatorType_e * osc_type,
                      struct Envelope_s * envelope)
 {
-    *frequency += 10;
-    *tune = get_tune(*frequency);
+    ++(*note);
+    *tune = get_tune(*note);
 }
 
-static void pitch_down(uint32_t * frequency,
+static void pitch_down(uint8_t * note,
                        uint32_t * tune,
                        enum OscillatorType_e * osc_type,
                        struct Envelope_s * envelope)
 {
-    *frequency -= 10;
-    *tune = get_tune(*frequency);
+    --(*note);
+    *tune = get_tune(*note);
 }
 
-static void gain_up(uint32_t * frequency,
+static void gain_up(uint8_t * note,
                     uint32_t * tune,
                     enum OscillatorType_e * osc_type,
                     struct Envelope_s * envelope)
@@ -542,7 +567,7 @@ static void gain_up(uint32_t * frequency,
     }
 }
 
-static void gain_down(uint32_t * frequency,
+static void gain_down(uint8_t * note,
                       uint32_t * tune,
                       enum OscillatorType_e * osc_type,
                       struct Envelope_s * envelope)
@@ -554,7 +579,7 @@ static void gain_down(uint32_t * frequency,
     }
 }
 
-static void wave_next(uint32_t * frequency,
+static void wave_next(uint8_t * note,
                       uint32_t * tune,
                       enum OscillatorType_e * osc_type,
                       struct Envelope_s * envelope)
@@ -569,7 +594,7 @@ static void wave_next(uint32_t * frequency,
     }
 }
 
-static void wave_prev(uint32_t * frequency,
+static void wave_prev(uint8_t * note,
                       uint32_t * tune,
                       enum OscillatorType_e * osc_type,
                       struct Envelope_s * envelope)
@@ -584,7 +609,7 @@ static void wave_prev(uint32_t * frequency,
     }
 }
 
-static void note_on(uint32_t * frequency,
+static void note_on(uint8_t * note,
                     uint32_t * tune,
                     enum OscillatorType_e * osc_type,
                     struct Envelope_s * envelope)
@@ -593,7 +618,7 @@ static void note_on(uint32_t * frequency,
     envelope->rate = (UINT32_MAX - envelope->level) / envelope->attack_samples;
 }
 
-static void note_off(uint32_t * frequency,
+static void note_off(uint8_t * note,
                      uint32_t * tune,
                      enum OscillatorType_e * osc_type,
                      struct Envelope_s * envelope)
@@ -748,6 +773,14 @@ static bool generate_wave_tables(void)
     return status;
 }
 
+static void generate_midi_freq_tbl(void)
+{
+    for (int idx = 0; idx < NUM_NOTES; ++idx)
+    {
+        midi_freq_lut[idx] = 440.0f * powf(2.0f, ((float)idx - 69) / 12.0f);
+    }
+}
+
 int main(void)
 {
 #if DEBUG_CONSOLE
@@ -755,7 +788,7 @@ int main(void)
     console_set_render_mode(RENDER_AUTOMATIC);
 #endif
 
-    uint32_t frequency  = DEFAULT_FREQUENCY;
+    uint8_t note = DEFAULT_NOTE;
     uint32_t phase = 0u;
     uint32_t tune = 0u;
     enum OscillatorType_e osc_type = SINE;
@@ -782,9 +815,12 @@ int main(void)
         return -1;
     }
 
+    draw_splash(GEN_FREQ_TBL);
+    generate_midi_freq_tbl();
+
     draw_splash(INIT_AUDIO);
 	audio_init(SAMPLE_RATE, NUM_AUDIO_BUFFERS);
-    tune = get_tune(frequency);
+    tune = get_tune(note);
 
     draw_splash(ALLOC_MIX_BUF);
     mix_buffer_len = 2 * audio_get_buffer_length() * sizeof(short);
@@ -795,14 +831,14 @@ int main(void)
     }
 
     draw_splash(COMPLETE);
-    graphics_draw(osc_type, frequency);
+    graphics_draw(osc_type, note);
 
 	while(1) {
         HandlerFunc handler = input_poll();
         if (handler)
         {
-            handler(&frequency, &tune, &osc_type, &envelope);
-            graphics_draw(osc_type, frequency);
+            handler(&note, &tune, &osc_type, &envelope);
+            graphics_draw(osc_type, note);
         }
 
         audio_buffer_run(&phase, tune, osc_wave_tables[osc_type], &envelope);
