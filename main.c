@@ -9,7 +9,10 @@
 /// COMPILER CONSTANTS/DEFINITIONS
 ///
 #define SAMPLE_RATE 44100
-#define WAVE_TABLE_SIZE ((size_t)(UINT16_MAX + 1))
+#define WT_BIT_DEPTH 11 // 2048 table entries
+#define WT_SIZE (1 << WT_BIT_DEPTH)
+#define ACCUMULATOR_BITS 32
+#define FRAC_BITS (ACCUMULATOR_BITS - WT_BIT_DEPTH)
 #define NUM_AUDIO_BUFFERS 4
 #define DEFAULT_FREQUENCY 440u
 
@@ -100,7 +103,7 @@ static inline uint32_t get_tune(uint32_t const frequency);
 
 static short interpolate_delta(int16_t const y0,
                                int16_t const y1,
-                               uint16_t const frac);
+                               uint32_t const frac);
 
 static void audio_buffer_run(uint32_t * phase,
                              uint32_t const tune,
@@ -120,31 +123,38 @@ static short * generate_square_lut(float target_rms, size_t num_harmonics);
 static short * generate_triangle_lut(float target_rms, size_t num_harmonics);
 static short * generate_ramp_lut(float target_rms, size_t num_harmonics);
 
+// TODO: Support direct (not wavetable) synthesis
+// static short triangle_component(uint32_t const phase);
+// static short square_component(uint32_t const phase);
+// static short ramp_component(uint32_t const phase);
+
 
 /// 
 /// FUNCTION DEFINITIONS
 ///
 static void rms_normalize(short * lut, float * temp_lut, float target_rms, float sum_squares)
 {
-    float const rms = sqrtf(sum_squares / WAVE_TABLE_SIZE);
+    float const rms = sqrtf(sum_squares / WT_SIZE);
     float const scale = target_rms / rms;
 
     printf("Target: %f, RMS: %f, scale: %f\n", target_rms, rms, scale);
 
-    for (size_t i = 0; i < WAVE_TABLE_SIZE; ++i)
+    for (size_t i = 0; i < WT_SIZE; ++i)
     {
         lut[i] = (short)(INT16_MAX * temp_lut[i] * scale);
     }
+
+    lut[WT_SIZE] = lut[0];
 }
 
 static short * generate_sine_lut(float * sum_squares)
 {
-    short * lut = malloc(WAVE_TABLE_SIZE * sizeof(short));
+    short * lut = malloc((WT_SIZE + 1) * sizeof(short));
     if (!lut) return NULL;
 
-    float const phase_step = (2.0f * M_PI) / WAVE_TABLE_SIZE;
+    float const phase_step = (2.0f * M_PI) / WT_SIZE;
 
-    for (size_t i = 0; i < WAVE_TABLE_SIZE; ++i)
+    for (size_t i = 0; i < WT_SIZE; ++i)
     {
         float temp = sinf((float)i * phase_step);
         (*sum_squares) += temp * temp;
@@ -152,21 +162,23 @@ static short * generate_sine_lut(float * sum_squares)
         lut[i] = (short)(INT16_MAX/2 * temp);
     }
 
+    lut[WT_SIZE] = lut[0];
+
     return lut;
 }
 
 static short * generate_square_lut(float target_rms, size_t num_harmonics)
 {
-    short * lut = malloc(WAVE_TABLE_SIZE * sizeof(short));
+    short * lut = malloc((WT_SIZE + 1) * sizeof(short));
     if (!lut) return NULL;
-    float * temp_lut = malloc(WAVE_TABLE_SIZE * sizeof(float));
+    float * temp_lut = malloc(WT_SIZE * sizeof(float));
     if (!lut) return NULL;
 
-    float const phase_step = (2.0f * M_PI) / WAVE_TABLE_SIZE;
-    
+    float const phase_step = (2.0f * M_PI) / WT_SIZE;
+
     float sum_squares = 0;
 
-    for (size_t i = 0; i < WAVE_TABLE_SIZE; ++i)
+    for (size_t i = 0; i < WT_SIZE; ++i)
     {
         temp_lut[i] = 0;
         for (size_t h = 1; h <= num_harmonics; h+=2)
@@ -184,16 +196,16 @@ static short * generate_square_lut(float target_rms, size_t num_harmonics)
 
 static short * generate_triangle_lut(float target_rms, size_t num_harmonics)
 {
-    short * lut = malloc(WAVE_TABLE_SIZE * sizeof(short));
+    short * lut = malloc((WT_SIZE + 1) * sizeof(short));
     if (!lut) return NULL;
-    float * temp_lut = malloc(WAVE_TABLE_SIZE * sizeof(float));
+    float * temp_lut = malloc(WT_SIZE * sizeof(float));
     if (!lut) return NULL;
 
-    float const phase_step = (2.0f * M_PI) / WAVE_TABLE_SIZE;
+    float const phase_step = (2.0f * M_PI) / WT_SIZE;
 
     float sum_squares = 0;
 
-    for (size_t i = 0; i < WAVE_TABLE_SIZE; ++i)
+    for (size_t i = 0; i < WT_SIZE; ++i)
     {
         temp_lut[i] = 0;
         float sign = 1.0f;
@@ -213,16 +225,16 @@ static short * generate_triangle_lut(float target_rms, size_t num_harmonics)
 
 static short * generate_ramp_lut(float target_rms, size_t num_harmonics)
 {
-    short * lut = malloc(WAVE_TABLE_SIZE * sizeof(short));
+    short * lut = malloc((WT_SIZE + 1) * sizeof(short));
     if (!lut) return NULL;
-    float * temp_lut = malloc(WAVE_TABLE_SIZE * sizeof(float));
+    float * temp_lut = malloc(WT_SIZE * sizeof(float));
     if (!lut) return NULL;
 
-    float const phase_step = (2.0f * M_PI) / WAVE_TABLE_SIZE;
+    float const phase_step = (2.0f * M_PI) / WT_SIZE;
 
     float sum_squares = 0;
 
-    for (size_t i = 0; i < WAVE_TABLE_SIZE; ++i)
+    for (size_t i = 0; i < WT_SIZE; ++i)
     {
         temp_lut[i] = 0;
         for (size_t h = 1; h <= num_harmonics; ++h)
@@ -245,57 +257,50 @@ static inline uint32_t get_tune(uint32_t const frequency)
 
 static short interpolate_delta(int16_t const y0,
                                int16_t const y1,
-                               uint16_t const frac)
+                               uint32_t const frac)
 {
-    // Max delta: (+/-)UINT16_MAX
-    //        =>  (INT16_MAX - INT16_MIN) =  UINT16_MAX
-    //            (INT16_MIN - INT16_MAX) = -UINT16_MAX
-    // Max frac: UINT16_MAX
-    //
-    // Worst case: UINT16_MAX * (+/-)UINT16_MAX = (+/-)UINT32_MAX
-    // delta * frac product casted to int64_t
 
-    return (short) (((int64_t)((int32_t)(y1 - y0) * (int32_t)frac)) >> 16);
+    return (short) (((int64_t)((int32_t)(y1 - y0) * (int32_t)frac)) >> FRAC_BITS);
 }
 
 static short phase_to_amplitude(uint32_t const phase, short * wave_table)
 {
-    uint16_t const phase_int = (uint16_t const)((phase) >> 16);
-    uint16_t const phase_frac = (uint16_t const)phase;
+    uint16_t const phase_int = (uint16_t const)((phase) >> FRAC_BITS);
+    uint32_t const phase_frac = (uint32_t const)(phase & ((1 << FRAC_BITS) - 1));
 
     short const y0 = wave_table[phase_int];
-    short const y1 = wave_table[phase_int + 1]; // Wrap around
+    short const y1 = wave_table[phase_int + 1];
 
     return y0 + interpolate_delta(y0, y1, phase_frac);
 }
 
-static short triangle_component(uint32_t const phase)
-{
-    uint32_t phase_temp = phase + 0x40000000;
-    phase_temp >>= 15;
-    if (phase_temp & 0x10000)
-    {
-        phase_temp = 0x1FFFF - phase_temp;
-    }
-    return (short)(phase_temp - 0x8000);
-}
+// static short triangle_component(uint32_t const phase)
+// {
+//     uint32_t phase_temp = phase + 0x40000000;
+//     phase_temp >>= 15;
+//     if (phase_temp & 0x10000)
+//     {
+//         phase_temp = 0x1FFFF - phase_temp;
+//     }
+//     return (short)(phase_temp - 0x8000);
+// }
 
-static short square_component(uint32_t const phase)
-{
-    if (phase & 0x80000000)
-    {
-        return INT16_MIN;
-    }
-    else
-    {
-        return INT16_MAX;
-    }
-}
+// static short square_component(uint32_t const phase)
+// {
+//     if (phase & 0x80000000)
+//     {
+//         return INT16_MIN;
+//     }
+//     else
+//     {
+//         return INT16_MAX;
+//     }
+// }
 
-static short ramp_component(uint32_t const phase)
-{
-    return (short)((phase) >> 16);
-}
+// static short ramp_component(uint32_t const phase)
+// {
+//     return (short)((phase) >> 16);
+// }
 
 
 static void write_ai_buffer(short * buffer, size_t const num_samples,
@@ -319,7 +324,7 @@ static void write_ai_buffer(short * buffer, size_t const num_samples,
 
             // Write stereo samples
             buffer[i] = amplitude;
-            buffer[i+1] = amplitude;  
+            buffer[i+1] = amplitude;
 
             // Increment phase
             *phase += tune;
@@ -594,7 +599,7 @@ static void note_off(uint32_t * frequency,
                      struct Envelope_s * envelope)
 {
     if (IDLE != envelope->state)
-    {   
+    {
         envelope->state = RELEASE;
         envelope->rate = (envelope->level - 0) / envelope->release_samples;
     }
@@ -657,17 +662,20 @@ static void audio_buffer_run(uint32_t * phase,
         ++write_cnt;
 #endif
         short * buffer = audio_write_begin();
-        if (mix_buffer_full)
+        if (buffer)
         {
-            memcpy(buffer, mix_buffer, mix_buffer_len);
-            mix_buffer_full = false;
-        }
-        else
-        {
-            write_ai_buffer(buffer, audio_get_buffer_length(),
-                            wave_table,
-                            phase, tune,
-                            envelope);
+            if (mix_buffer_full)
+            {
+                memcpy(buffer, mix_buffer, mix_buffer_len);
+                mix_buffer_full = false;
+            }
+            else
+            {
+                write_ai_buffer(buffer, audio_get_buffer_length(),
+                                wave_table,
+                                phase, tune,
+                                envelope);
+            }
         }
         audio_write_end();
     }
@@ -703,7 +711,7 @@ static bool generate_wave_tables(void)
     }
     else
     {
-        target_rms = 0.5f * sqrtf(sum_squares/WAVE_TABLE_SIZE);
+        target_rms = 0.5f * sqrtf(sum_squares/WT_SIZE);
     }
 
     size_t const num_harmonics = 120;
@@ -740,7 +748,13 @@ static bool generate_wave_tables(void)
     return status;
 }
 
-int main(void) {
+int main(void)
+{
+#if DEBUG_CONSOLE
+    console_init();
+    console_set_render_mode(RENDER_AUTOMATIC);
+#endif
+
     uint32_t frequency  = DEFAULT_FREQUENCY;
     uint32_t phase = 0u;
     uint32_t tune = 0u;
@@ -760,13 +774,8 @@ int main(void) {
     draw_splash(INIT);
 
     joypad_init();
-	debug_init_isviewer();
-	debug_init_usblog();
-
-#if DEBUG_CONSOLE
-    console_init();
-    console_set_render_mode(RENDER_AUTOMATIC);
-#endif
+    debug_init_isviewer();
+    debug_init_usblog();
 
     if (!generate_wave_tables())
     {
