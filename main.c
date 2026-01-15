@@ -369,7 +369,7 @@ static void draw_splash(enum InitState_e init_state)
     display_context_t disp = display_get();
     graphics_fill_screen(disp, 0);
     graphics_draw_text(disp, 30, 10, "N64 Wavetable Synthesizer\t\t\t\t\tv0.1");
-    graphics_draw_text(disp, 30, 18, "(c) 2025 Michael Bowcutt");
+    graphics_draw_text(disp, 30, 18, "(c) 2026 Michael Bowcutt");
 
     if (GEN_SINE == init_state)
     {
