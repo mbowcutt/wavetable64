@@ -34,7 +34,6 @@ enum InitState_e
     GEN_FREQ_TBL,
     ALLOC_MIX_BUF,
     INIT_AUDIO,
-    COMPLETE,
 };
 
 enum OscillatorType_e {
@@ -434,19 +433,7 @@ static void draw_splash(enum InitState_e init_state)
         graphics_draw_text(disp, 60, 124, "Audio subsystem initialized.");
     }
 
-    if (COMPLETE == init_state)
-    {
-        graphics_draw_text(disp, 60, 132, "Ready... Press Start");
-    }
-
     display_show(disp);
-
-    if (COMPLETE == init_state)
-    {
-        do {
-            joypad_poll();
-        } while (!joypad_get_buttons_pressed(JOYPAD_PORT_1).start);
-    }
 }
 
 
@@ -830,7 +817,6 @@ int main(void)
         return -1;
     }
 
-    draw_splash(COMPLETE);
     graphics_draw(osc_type, note);
 
 	while(1) {
