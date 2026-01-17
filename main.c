@@ -1,6 +1,7 @@
 #include <libdragon.h>
 #include <audio.h>
 #include <console.h>
+#include <midi.h>
 
 #include <math.h>
 #include <stdio.h>
@@ -96,6 +97,9 @@ static const char* note_names[] = {
     "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
 };
 
+static size_t midi_in_bytes = 0;
+static uint32_t midi_rx_ctr = 0;
+static uint8_t midi_in_buffer[31] = {0};
 
 ///
 /// STATIC PROTOTYPES
@@ -452,6 +456,15 @@ static void graphics_draw(enum OscillatorType_e osc_type,
     static char str_gain[64] = {0};
     snprintf(str_gain, 64, "Gain: %2.1f", mix_gain);
 
+    static char str_midi_data[64];
+    snprintf(str_midi_data, 64, "MIDI RX got %d bytes (%ld): ", midi_in_bytes, midi_rx_ctr);
+    for (uint8_t idx = 0; (idx < midi_in_bytes) && (idx < 31); ++idx)
+    {
+        char tmp[6];
+        snprintf(tmp, 6, "0x%02X ", midi_in_buffer[idx]);
+        strcat(str_midi_data, tmp);
+    }
+
 #if DEBUG_AUDIO_BUFFER_STATS
     static char str_dbg_audio_buf_stats[64] = {0};
     snprintf(str_dbg_audio_buf_stats, 64, "Write cnt: %u\nLocal write cnt:%u\nNo write cnt: %u",
@@ -461,13 +474,15 @@ static void graphics_draw(enum OscillatorType_e osc_type,
     display_context_t disp = display_get();
 	graphics_fill_screen(disp, 0);
     graphics_draw_text(disp, 30, 10, "N64 Wavetable Synthesizer\t\t\t\t\tv0.1");
-	graphics_draw_text(disp, 30, 18, "(c) 2025 Michael Bowcutt");
+	graphics_draw_text(disp, 30, 18, "(c) 2026 Michael Bowcutt");
 	graphics_draw_text(disp, 30, 50, str_osc);
     graphics_draw_text(disp, 30, 58, str_freq);
     graphics_draw_text(disp, 30, 66, str_gain);
+    graphics_draw_text(disp, 30, 74, str_midi_data);
 #if DEBUG_AUDIO_BUFFER_STATS
     graphics_draw_text(disp, 30, 74, str_dbg_audio_buf_stats);
 #endif
+
 	display_show(disp);
 }
 
@@ -768,13 +783,14 @@ static void generate_midi_freq_tbl(void)
     }
 }
 
+static void handle_midi_input(uint8_t * midi_in_buffer,
+                              size_t midi_in_bytes)
+{
+    // todo process messages
+}
+
 int main(void)
 {
-#if DEBUG_CONSOLE
-    console_init();
-    console_set_render_mode(RENDER_AUTOMATIC);
-#endif
-
     uint8_t note = DEFAULT_NOTE;
     uint32_t phase = 0u;
     uint32_t tune = 0u;
@@ -789,8 +805,13 @@ int main(void)
         .release_samples = SAMPLE_RATE,  // 1 second release
     };
 
-
 	display_init(RESOLUTION_512x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
+
+#if DEBUG_CONSOLE
+    console_init();
+    console_set_render_mode(RENDER_MANUAL);
+#endif
+
     draw_splash(INIT);
 
     joypad_init();
@@ -819,12 +840,33 @@ int main(void)
 
     graphics_draw(osc_type, note);
 
+    bool update_graphics = false;
+    HandlerFunc handler = NULL;
+
 	while(1) {
-        HandlerFunc handler = input_poll();
+        handler = input_poll();
         if (handler)
         {
             handler(&note, &tune, &osc_type, &envelope);
+            handler = NULL;
+            update_graphics = true;
+        }
+
+        midi_in_bytes = midi_rx_poll(JOYPAD_PORT_1,
+                                     midi_in_buffer,
+                                     sizeof(midi_in_buffer));
+
+        if (midi_in_bytes > 0)
+        {
+            ++midi_rx_ctr;
+            handle_midi_input(midi_in_buffer, midi_in_bytes);
+            update_graphics = true;
+        }
+
+        if (update_graphics)
+        {
             graphics_draw(osc_type, note);
+            update_graphics = false;
         }
 
         audio_buffer_run(&phase, tune, osc_wave_tables[osc_type], &envelope);
