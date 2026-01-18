@@ -25,7 +25,7 @@
 ///
 /// TYPES/DEFINITIONS
 ///
-enum InitState_e
+enum init_state_e
 {
     INIT,
     GEN_SINE,
@@ -37,7 +37,7 @@ enum InitState_e
     INIT_AUDIO,
 };
 
-enum OscillatorType_e {
+enum oscillator_type_e {
     SINE,
     TRIANGLE,
     SQUARE,
@@ -45,18 +45,18 @@ enum OscillatorType_e {
     NUM_OSCILLATORS
 };
 
-enum EnvelopeState_e {
+enum envelope_state_e {
     IDLE,
     ATTACK,
     DECAY,
     SUSTAIN,
     RELEASE,
-    NUM_ENVELOPE_STATES
+    NUM_envelope_sTATES
 };
 
-struct Envelope_s
+struct envelope_s
 {
-    enum EnvelopeState_e state;
+    enum envelope_state_e state;
     uint32_t level;
     uint32_t rate;
 
@@ -96,12 +96,13 @@ static size_t midi_in_bytes = 0;
 static uint32_t midi_rx_ctr = 0;
 static uint8_t midi_in_buffer[31] = {0};
 
+static enum oscillator_type_e osc_type = SINE;
+
 static uint8_t note = DEFAULT_NOTE;
 static uint32_t phase = 0u;
 static uint32_t tune = 0u;
-static enum OscillatorType_e osc_type = SINE;
 
-static struct Envelope_s envelope = {
+static struct envelope_s envelope = {
     .level = 0u,
     .state = IDLE,
     .attack_samples = SAMPLE_RATE,  // 1 second attack
@@ -124,7 +125,7 @@ static short interpolate_delta(int16_t const y0,
 
 static void audio_buffer_run(short * wave_table);
 
-static void draw_splash(enum InitState_e init_state);
+static void draw_splash(enum init_state_e init_state);
 static void graphics_draw(void);
 
 static char * get_osc_type_str(void);
@@ -365,7 +366,7 @@ static char * get_osc_type_str(void)
     }
 }
 
-static void draw_splash(enum InitState_e init_state)
+static void draw_splash(enum init_state_e init_state)
 {
     display_context_t disp = display_get();
     graphics_fill_screen(disp, 0);
@@ -529,7 +530,7 @@ static void envelope_tick(void)
                 }
             }
             break;
-        case NUM_ENVELOPE_STATES:
+        case NUM_envelope_sTATES:
         default:
             break;
     }
