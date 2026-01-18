@@ -783,10 +783,34 @@ static void generate_midi_freq_tbl(void)
     }
 }
 
-static void handle_midi_input(uint8_t * midi_in_buffer,
-                              size_t midi_in_bytes)
+static void handle_midi_input(size_t midi_in_bytes,
+                              uint8_t * note,
+                              uint32_t * tune,
+                              enum OscillatorType_e * osc_type,
+                              struct Envelope_s * envelope)
 {
-    // todo process messages
+    static midi_parser_state midi_parser = {0};
+
+    midi_msg msg_buf[sizeof(midi_in_buffer) / sizeof(midi_msg)] = {0};
+    size_t num_msgs = midi_process_messages(&midi_parser, 
+                                             midi_in_buffer, midi_in_bytes,
+                                             msg_buf, sizeof(msg_buf));
+    for (size_t msg_idx = 0; msg_idx < num_msgs; ++msg_idx)
+    {
+        midi_msg msg = msg_buf[msg_idx];
+
+        if ((MIDI_NOTE_OFF == msg.status)
+            || ((MIDI_NOTE_ON == msg.status) && (0 == msg.data[1])))
+        {
+            note_off(note, tune, osc_type, envelope);
+        }
+        else if (MIDI_NOTE_ON == msg.status)
+        {
+            *note = msg.data[0];
+            *tune = get_tune(msg.data[0]);
+            note_on(note, tune, osc_type, envelope);
+        }
+    }
 }
 
 int main(void)
@@ -859,7 +883,8 @@ int main(void)
         if (midi_in_bytes > 0)
         {
             ++midi_rx_ctr;
-            handle_midi_input(midi_in_buffer, midi_in_bytes);
+            handle_midi_input(midi_in_bytes,
+                              &note, &tune, &osc_type, &envelope);
             update_graphics = true;
         }
 
