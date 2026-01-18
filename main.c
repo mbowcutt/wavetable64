@@ -66,8 +66,6 @@ struct Envelope_s
     uint32_t release_samples;
 };
 
-typedef void (*HandlerFunc)(void);
-
 
 ///
 /// GLOBAL VARIABLES
@@ -132,8 +130,6 @@ static void graphics_draw(void);
 static char * get_osc_type_str(void);
 
 static void envelope_tick(void);
-
-static HandlerFunc input_poll(void);
 
 static void rms_normalize(short * lut, float * temp_lut, float target_rms, float sum_squares);
 
@@ -539,16 +535,6 @@ static void envelope_tick(void)
     }
 }
 
-static void pitch_up(void)
-{
-    tune = get_tune(++note);
-}
-
-static void pitch_down(void)
-{
-    tune = get_tune(--note);
-}
-
 static void gain_up(void)
 {
     mix_gain += 0.1f;
@@ -604,53 +590,6 @@ static void note_off(void)
         envelope.state = RELEASE;
         envelope.rate = (envelope.level - 0) / envelope.release_samples;
     }
-}
-
-static HandlerFunc input_poll(void)
-{
-    HandlerFunc handler = NULL;
-
-    joypad_poll();
-
-    joypad_buttons_t ckeys = joypad_get_buttons_pressed(JOYPAD_PORT_1);
-    if (ckeys.d_left)
-    {
-        handler = pitch_down;
-    }
-    else if (ckeys.d_right)
-    {
-        handler = pitch_up;
-    }
-    else if (ckeys.d_up)
-    {
-        handler = gain_up;
-    }
-    else if (ckeys.d_down)
-    {
-        handler = gain_down;
-    }
-    else if (ckeys.r)
-    {
-        handler = wave_next;
-    }
-    else if (ckeys.l)
-    {
-        handler = wave_prev;
-    }
-    else if (ckeys.a)
-    {
-        handler = note_on;
-    }
-    else
-    {
-        ckeys = joypad_get_buttons_released(JOYPAD_PORT_1);
-        if (ckeys.a)
-        {
-            handler = note_off;
-        }
-    }
-
-    return handler;
 }
 
 static void audio_buffer_run(short * wave_table)
@@ -814,17 +753,8 @@ int main(void)
     graphics_draw();
 
     bool update_graphics = false;
-    HandlerFunc handler = NULL;
 
 	while(1) {
-        handler = input_poll();
-        if (handler)
-        {
-            handler();
-            handler = NULL;
-            update_graphics = true;
-        }
-
         midi_in_bytes = midi_rx_poll(JOYPAD_PORT_1,
                                      midi_in_buffer,
                                      sizeof(midi_in_buffer));
