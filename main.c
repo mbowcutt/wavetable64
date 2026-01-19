@@ -15,8 +15,8 @@
 #define ACCUMULATOR_BITS 32
 #define FRAC_BITS (ACCUMULATOR_BITS - WT_BIT_DEPTH)
 #define NUM_AUDIO_BUFFERS 4
-#define DEFAULT_NOTE 69 // Middle A (440Hz)
 #define NUM_NOTES 128
+#define POLYPHONY_COUNT 8
 
 #define DEBUG_AUDIO_BUFFER_STATS 0
 #define DEBUG_CONSOLE 0
@@ -56,16 +56,20 @@ enum envelope_state_e {
 
 struct envelope_s
 {
-    enum envelope_state_e state;
-    uint32_t level;
-    uint32_t rate;
-
     uint32_t attack_samples;
     uint32_t decay_samples;
     uint32_t sustain_level;
     uint32_t release_samples;
 };
 
+typedef struct
+{
+    uint32_t phase;
+    uint32_t tune;
+    enum envelope_state_e amp_env_state;
+    uint32_t amp_level;
+    uint32_t amp_env_rate;
+} voice_t;
 
 ///
 /// GLOBAL VARIABLES
@@ -97,19 +101,8 @@ static uint32_t midi_rx_ctr = 0;
 static uint8_t midi_in_buffer[31] = {0};
 
 static enum oscillator_type_e osc_type = SINE;
-
-static uint8_t note = DEFAULT_NOTE;
-static uint32_t phase = 0u;
-static uint32_t tune = 0u;
-
-static struct envelope_s envelope = {
-    .level = 0u,
-    .state = IDLE,
-    .attack_samples = SAMPLE_RATE,  // 1 second attack
-    .decay_samples = SAMPLE_RATE,   // 1 second decay
-    .sustain_level = 0x7FFFFFFF, // 50% sustain level
-    .release_samples = SAMPLE_RATE,  // 1 second release
-};
+static struct envelope_s amp_env;
+static voice_t voices[POLYPHONY_COUNT];
 
 ///
 /// STATIC PROTOTYPES
@@ -117,7 +110,7 @@ static struct envelope_s envelope = {
 static void write_ai_buffer(short * buffer, size_t const num_samples,
                             short * wave_table);
 
-static inline uint32_t get_tune(uint8_t const midi_note);
+static inline uint32_t get_tune(uint8_t const note);
 
 static short interpolate_delta(int16_t const y0,
                                int16_t const y1,
@@ -140,6 +133,8 @@ static short * generate_sine_lut(float * sum_squares);
 static short * generate_square_lut(float target_rms, size_t num_harmonics);
 static short * generate_triangle_lut(float target_rms, size_t num_harmonics);
 static short * generate_ramp_lut(float target_rms, size_t num_harmonics);
+
+static void init_voices(void);
 
 // TODO: Support direct (not wavetable) synthesis
 // static short triangle_component(uint32_t const phase);
@@ -268,9 +263,9 @@ static short * generate_ramp_lut(float target_rms, size_t num_harmonics)
     return lut;
 }
 
-static inline uint32_t get_tune(uint8_t const midi_note)
+static inline uint32_t get_tune(uint8_t const note)
 {
-    return (uint32_t)((midi_freq_lut[midi_note] * ((uint64_t)1 << ACCUMULATOR_BITS)) / SAMPLE_RATE);
+    return (uint32_t)((midi_freq_lut[note] * ((uint64_t)1 << ACCUMULATOR_BITS)) / SAMPLE_RATE);
 }
 
 static short interpolate_delta(int16_t const y0,
@@ -331,9 +326,10 @@ static void write_ai_buffer(short * buffer, size_t const num_samples,
             short amplitude = 0;
 
             // For each voice:
-            short component = phase_to_amplitude(phase, wave_table);
+            voice_t * voice = &voices[0];
+            short component = phase_to_amplitude(voice->phase, wave_table);
 
-            component = (short)(((int64_t)component * (int64_t)envelope.level) / UINT32_MAX);
+            component = (short)(((int64_t)component * (int64_t)voice->amp_level) / UINT32_MAX);
 
             amplitude += (short)(mix_gain * component);
 
@@ -342,7 +338,7 @@ static void write_ai_buffer(short * buffer, size_t const num_samples,
             buffer[i+1] = amplitude;
 
             // Increment phase
-            phase += tune;
+            voice->phase += voice->tune;
             envelope_tick();
         }
     }
@@ -444,12 +440,6 @@ static void graphics_draw(void)
     static char str_osc[64] = {0};
     snprintf(str_osc, 64, "Oscillator: %s", get_osc_type_str());
 
-    static char str_freq[64] = {0};
-    snprintf(str_freq, 64, "MIDI note: %s%d (%u) - %f Hz",
-             note_names[note % 12],
-             (note / 12) - 1,
-             note, midi_freq_lut[note]);
-
     static char str_gain[64] = {0};
     snprintf(str_gain, 64, "Gain: %2.1f", mix_gain);
 
@@ -473,7 +463,6 @@ static void graphics_draw(void)
     graphics_draw_text(disp, 30, 10, "N64 Wavetable Synthesizer\t\t\t\t\tv0.1");
 	graphics_draw_text(disp, 30, 18, "(c) 2026 Michael Bowcutt");
 	graphics_draw_text(disp, 30, 50, str_osc);
-    graphics_draw_text(disp, 30, 58, str_freq);
     graphics_draw_text(disp, 30, 66, str_gain);
     graphics_draw_text(disp, 30, 74, str_midi_data);
 #if DEBUG_AUDIO_BUFFER_STATS
@@ -485,48 +474,50 @@ static void graphics_draw(void)
 
 static void envelope_tick(void)
 {
-    switch (envelope.state)
+    voice_t * voice = &voices[0];
+    switch (voice->amp_env_state)
     {
         case IDLE:
             break;
         case ATTACK:
-            if (UINT32_MAX > envelope.level)
+            if (UINT32_MAX > voice->amp_level)
             {
-                if ((UINT32_MAX - envelope.level) < envelope.rate)
+                if ((UINT32_MAX - voice->amp_level) < voice->amp_env_rate)
                 {
-                    envelope.level = UINT32_MAX;
-                    envelope.state = DECAY;
+                    voice->amp_level = UINT32_MAX;
+                    voice->amp_env_state = DECAY;
+                    // TODO: Implement decay rate
                 }
                 else
                 {
-                    envelope.level += envelope.rate;
+                    voice->amp_level += voice->amp_env_rate;
                 }
             }
             break;
         case DECAY:
-            if (envelope.sustain_level < envelope.level)
+            if (amp_env.sustain_level < voice->amp_level)
             {
-                envelope.level -= envelope.rate;
-                if (envelope.sustain_level >= envelope.level)
+                voice->amp_level -= voice->amp_env_rate;
+                if (amp_env.sustain_level >= voice->amp_level)
                 {
-                    envelope.level = envelope.sustain_level;
-                    envelope.state = SUSTAIN;
+                    voice->amp_level = amp_env.sustain_level;
+                    voice->amp_env_state = SUSTAIN;
                 }
             }
             break;
         case SUSTAIN:
             break;
         case RELEASE:
-            if (0 < envelope.level)
+            if (0 < voice->amp_level)
             {
-                if ((envelope.level) < envelope.rate)
+                if ((voice->amp_level) < voice->amp_env_rate)
                 {
-                    envelope.level = 0;
-                    envelope.state = IDLE;
+                    voice->amp_level = 0;
+                    voice->amp_env_state = IDLE;
                 }
                 else
                 {
-                    envelope.level -= envelope.rate;
+                    voice->amp_level -= voice->amp_env_rate;
                 }
             }
             break;
@@ -578,18 +569,19 @@ static void wave_prev(void)
     }
 }
 
-static void note_on(void)
+static void note_on(voice_t * voice, uint8_t note)
 {
-    envelope.state = ATTACK;
-    envelope.rate = (UINT32_MAX - envelope.level) / envelope.attack_samples;
+    voice->tune = get_tune(note);
+    voice->amp_env_state = ATTACK;
+    voice->amp_env_rate = (UINT32_MAX - voice->amp_level) / amp_env.attack_samples;
 }
 
-static void note_off(void)
+static void note_off(voice_t * voice)
 {
-    if (IDLE != envelope.state)
+    if (IDLE != voice->amp_env_state)
     {
-        envelope.state = RELEASE;
-        envelope.rate = (envelope.level - 0) / envelope.release_samples;
+        voice->amp_env_state = RELEASE;
+        voice->amp_env_rate = (voice->amp_level - 0) / amp_env.release_samples;
     }
 }
 
@@ -705,14 +697,35 @@ static void handle_midi_input(size_t midi_in_bytes)
         if ((MIDI_NOTE_OFF == msg.status)
             || ((MIDI_NOTE_ON == msg.status) && (0 == msg.data[1])))
         {
-            note_off();
+            // TODO: Find voice to close
+            voice_t * voice = &voices[0];
+            note_off(voice);
         }
         else if (MIDI_NOTE_ON == msg.status)
         {
-            note = msg.data[0];
-            tune = get_tune(msg.data[0]);
-            note_on();
+            // TODO: Find free voice
+            // TODO: Handle velocity
+            voice_t * voice = &voices[0];
+            note_on(voice, msg.data[0]);
         }
+    }
+}
+
+static void init_voices(void)
+{
+    amp_env.attack_samples = SAMPLE_RATE;  // 1 second attack
+    amp_env.decay_samples = SAMPLE_RATE;   // 1 second decay
+    amp_env.sustain_level = 0x7FFFFFFFu; // 50% sustain level
+    amp_env.release_samples = SAMPLE_RATE;  // 1 second release
+
+    for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
+    {
+        voice_t * voice = &voices[voice_idx];
+        voice->phase = 0u;
+        voice->tune = 0u;
+        voice->amp_env_state = IDLE;
+        voice->amp_level = 0u;
+        voice->amp_env_rate = 0u;
     }
 }
 
@@ -741,7 +754,7 @@ int main(void)
 
     draw_splash(INIT_AUDIO);
 	audio_init(SAMPLE_RATE, NUM_AUDIO_BUFFERS);
-    tune = get_tune(note);
+    init_voices();
 
     draw_splash(ALLOC_MIX_BUF);
     mix_buffer_len = 2 * audio_get_buffer_length() * sizeof(short);
