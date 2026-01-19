@@ -101,7 +101,7 @@ static const char* note_names[] = {
 
 static size_t midi_in_bytes = 0;
 static uint32_t midi_rx_ctr = 0;
-static uint8_t midi_in_buffer[31] = {0};
+static uint8_t midi_in_buffer[MIDI_RX_PAYLOAD] = {0};
 
 static enum oscillator_type_e osc_type = SINE;
 static struct envelope_s amp_env;
@@ -110,8 +110,7 @@ static voice_t voices[POLYPHONY_COUNT];
 ///
 /// STATIC PROTOTYPES
 ///
-static void write_ai_buffer(short * buffer, size_t const num_samples,
-                            short * wave_table);
+static void write_ai_buffer(short * buffer, size_t const num_samples);
 
 static inline uint32_t get_tune(uint8_t const note);
 
@@ -119,7 +118,7 @@ static short interpolate_delta(int16_t const y0,
                                int16_t const y1,
                                uint32_t const frac);
 
-static void audio_buffer_run(short * wave_table);
+static void audio_buffer_run(void);
 
 static void draw_splash(enum init_state_e init_state);
 static void graphics_draw(void);
@@ -321,8 +320,7 @@ static short phase_to_amplitude(uint32_t const component_phase, short * wave_tab
 // }
 
 
-static void write_ai_buffer(short * buffer, size_t const num_samples,
-                            short * wave_table)
+static void write_ai_buffer(short * buffer, size_t const num_samples)
 {
     if (buffer && (num_samples > 0))
     {
@@ -333,7 +331,11 @@ static void write_ai_buffer(short * buffer, size_t const num_samples,
             for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
             {
                 voice_t * voice = &voices[voice_idx];
-                short component = phase_to_amplitude(voice->phase, wave_table);
+
+                if (IDLE == voice->amp_env_state)
+                    continue;
+
+                short component = phase_to_amplitude(voice->phase, osc_wave_tables[osc_type]);
 
                 component = (short)(((int64_t)component * (int64_t)voice->amp_level) / UINT32_MAX);
 
@@ -391,7 +393,7 @@ static void draw_splash(enum init_state_e init_state)
     }
     else if (GEN_SQUARE < init_state)
     {
-        graphics_draw_text(disp, 60, 84, "Sqare wave generated.");
+        graphics_draw_text(disp, 60, 84, "Square wave generated.");
     }
 
     if (GEN_TRIANGLE == init_state)
@@ -452,7 +454,7 @@ static void graphics_draw(void)
 
     static char str_midi_data[64];
     snprintf(str_midi_data, 64, "MIDI RX got %d bytes (%ld): ", midi_in_bytes, midi_rx_ctr);
-    for (uint8_t idx = 0; (idx < midi_in_bytes) && (idx < 31); ++idx)
+    for (uint8_t idx = 0; (idx < midi_in_bytes) && (idx < MIDI_RX_PAYLOAD); ++idx)
     {
         char tmp[6];
         snprintf(tmp, 6, "0x%02X ", midi_in_buffer[idx]);
@@ -593,7 +595,7 @@ static void note_off(voice_t * voice)
     }
 }
 
-static void audio_buffer_run(short * wave_table)
+static void audio_buffer_run(void)
 {
     if (audio_can_write()) {
 #if DEBUG_AUDIO_BUFFER_STATS
@@ -609,8 +611,7 @@ static void audio_buffer_run(short * wave_table)
             }
             else
             {
-                write_ai_buffer(buffer, audio_get_buffer_length(),
-                                wave_table);
+                write_ai_buffer(buffer, audio_get_buffer_length());
             }
         }
         audio_write_end();
@@ -620,8 +621,7 @@ static void audio_buffer_run(short * wave_table)
 #if DEBUG_AUDIO_BUFFER_STATS
         ++local_write_cnt;
 #endif
-        write_ai_buffer(mix_buffer, audio_get_buffer_length(),
-                        wave_table);
+        write_ai_buffer(mix_buffer, audio_get_buffer_length());
         mix_buffer_full = true;
     }
     else
@@ -738,7 +738,7 @@ static void handle_midi_input(size_t midi_in_bytes)
 {
     static midi_parser_state midi_parser = {0};
 
-    midi_msg msg_buf[sizeof(midi_in_buffer) / sizeof(midi_msg)] = {0};
+    midi_msg msg_buf[MIDI_RX_PAYLOAD] = {0};
     size_t num_msgs = midi_process_messages(&midi_parser, 
                                              midi_in_buffer, midi_in_bytes,
                                              msg_buf, sizeof(msg_buf));
@@ -749,6 +749,8 @@ static void handle_midi_input(size_t midi_in_bytes)
         if ((MIDI_NOTE_OFF == msg.status)
             || ((MIDI_NOTE_ON == msg.status) && (0 == msg.data[1])))
         {
+            if (msg.data[0] >= NUM_NOTES)
+                continue;
             voice_t * voice = find_voice_to_close(msg.data[0]);
             if (voice)
             {
@@ -757,6 +759,8 @@ static void handle_midi_input(size_t midi_in_bytes)
         }
         else if (MIDI_NOTE_ON == msg.status)
         {
+            if (msg.data[0] >= NUM_NOTES)
+                continue;
             // TODO: Handle velocity
             voice_t * voice = find_next_voice();
             note_on(voice, msg.data[0]);
@@ -808,8 +812,8 @@ int main(void)
     generate_midi_freq_tbl();
 
     draw_splash(INIT_AUDIO);
-	audio_init(SAMPLE_RATE, NUM_AUDIO_BUFFERS);
     init_voices();
+    audio_init(SAMPLE_RATE, NUM_AUDIO_BUFFERS);
 
     draw_splash(ALLOC_MIX_BUF);
     mix_buffer_len = 2 * audio_get_buffer_length() * sizeof(short);
@@ -841,7 +845,7 @@ int main(void)
             update_graphics = false;
         }
 
-        audio_buffer_run(osc_wave_tables[osc_type]);
+        audio_buffer_run();
     }
 
     if (mix_buffer) free(mix_buffer);
