@@ -1,9 +1,19 @@
 BUILD_DIR=build
 include $(N64_INST)/include/n64.mk
 
-OBJS = $(BUILD_DIR)/main.o
+OBJS = $(BUILD_DIR)/main.o \
+       $(BUILD_DIR)/audio_engine.o \
+       $(BUILD_DIR)/display.o \
+       $(BUILD_DIR)/input.o \
+       $(BUILD_DIR)/voice.o \
+       $(BUILD_DIR)/wavetable.o
 
 AUDIOCONV_FLAGS ?=
+
+# Rule to compile C files into object files
+$(BUILD_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(N64_CFLAGS) -c -o $@ $<
 
 all: wavtable64.z64
 
