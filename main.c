@@ -2,6 +2,7 @@
 #include <audio.h>
 #include <console.h>
 #include <midi.h>
+#include <n64sys.h>
 
 #include <math.h>
 #include <stdio.h>
@@ -64,11 +65,13 @@ struct envelope_s
 
 typedef struct
 {
+    uint8_t note;
     uint32_t phase;
     uint32_t tune;
     enum envelope_state_e amp_env_state;
     uint32_t amp_level;
     uint32_t amp_env_rate;
+    uint64_t timestamp;
 } voice_t;
 
 ///
@@ -103,6 +106,7 @@ static uint8_t midi_in_buffer[31] = {0};
 static enum oscillator_type_e osc_type = SINE;
 static struct envelope_s amp_env;
 static voice_t voices[POLYPHONY_COUNT];
+static size_t active_voice_count = 0;
 
 ///
 /// STATIC PROTOTYPES
@@ -135,6 +139,8 @@ static short * generate_triangle_lut(float target_rms, size_t num_harmonics);
 static short * generate_ramp_lut(float target_rms, size_t num_harmonics);
 
 static void init_voices(void);
+static voice_t * find_next_voice(void);
+static voice_t * find_voice_to_close(uint8_t note);
 
 // TODO: Support direct (not wavetable) synthesis
 // static short triangle_component(uint32_t const phase);
@@ -514,6 +520,7 @@ static void envelope_tick(void)
                 {
                     voice->amp_level = 0;
                     voice->amp_env_state = IDLE;
+                    --active_voice_count;
                 }
                 else
                 {
@@ -571,9 +578,11 @@ static void wave_prev(void)
 
 static void note_on(voice_t * voice, uint8_t note)
 {
+    voice->note = note;
     voice->tune = get_tune(note);
     voice->amp_env_state = ATTACK;
     voice->amp_env_rate = (UINT32_MAX - voice->amp_level) / amp_env.attack_samples;
+    voice->timestamp = get_ticks();
 }
 
 static void note_off(voice_t * voice)
@@ -682,6 +691,62 @@ static void generate_midi_freq_tbl(void)
     }
 }
 
+static voice_t * find_next_voice(void)
+{
+    voice_t * voice = NULL;
+
+    if (active_voice_count < POLYPHONY_COUNT)
+    {
+        // There is a free voice, find one that's idle
+        for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
+        {
+            if (IDLE == voices[voice_idx].amp_env_state)
+            {
+                voice = &voices[voice_idx];
+                break;
+            }
+        }
+        active_voice_count++;
+    }
+    else
+    {
+        // Find the oldest voice
+        voice = &voices[0];
+        for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
+        {
+            if (voices[voice_idx].timestamp < voice->timestamp)
+            {
+                voice = &voices[voice_idx];
+            }
+        }
+    }
+
+    return voice;
+}
+
+static voice_t * find_voice_to_close(uint8_t note)
+{
+    voice_t * voice = &voices[0];
+
+    // Find the oldest voice that matches the note
+    for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
+    {
+        if ((note == voices[voice_idx].note)
+            && (voices[voice_idx].timestamp < voice->timestamp))
+        {
+            voice = &voices[voice_idx];
+        }
+    }
+
+    // Ensure the note actually matches in case the loop didn't find this note
+    if (note != voice->note)
+    {
+        voice = NULL;
+    }
+
+    return voice;
+}
+
 static void handle_midi_input(size_t midi_in_bytes)
 {
     static midi_parser_state midi_parser = {0};
@@ -698,14 +763,16 @@ static void handle_midi_input(size_t midi_in_bytes)
             || ((MIDI_NOTE_ON == msg.status) && (0 == msg.data[1])))
         {
             // TODO: Find voice to close
-            voice_t * voice = &voices[0];
-            note_off(voice);
+            voice_t * voice = find_voice_to_close(msg.data[0]);
+            if (voice)
+            {
+                note_off(voice);
+            }
         }
         else if (MIDI_NOTE_ON == msg.status)
         {
-            // TODO: Find free voice
             // TODO: Handle velocity
-            voice_t * voice = &voices[0];
+            voice_t * voice = find_next_voice();
             note_on(voice, msg.data[0]);
         }
     }
@@ -721,11 +788,13 @@ static void init_voices(void)
     for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
     {
         voice_t * voice = &voices[voice_idx];
+        voice->note = 0u;
         voice->phase = 0u;
         voice->tune = 0u;
         voice->amp_env_state = IDLE;
         voice->amp_level = 0u;
         voice->amp_env_rate = 0u;
+        voice->timestamp = 0u;
     }
 }
 
