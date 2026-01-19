@@ -127,7 +127,7 @@ static void graphics_draw(void);
 
 static char * get_osc_type_str(void);
 
-static void envelope_tick(void);
+static void envelope_tick(voice_t * voice);
 
 static void rms_normalize(short * lut, float * temp_lut, float target_rms, float sum_squares);
 
@@ -331,21 +331,23 @@ static void write_ai_buffer(short * buffer, size_t const num_samples,
         {
             short amplitude = 0;
 
-            // For each voice:
-            voice_t * voice = &voices[0];
-            short component = phase_to_amplitude(voice->phase, wave_table);
+            for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
+            {
+                voice_t * voice = &voices[voice_idx];
+                short component = phase_to_amplitude(voice->phase, wave_table);
 
-            component = (short)(((int64_t)component * (int64_t)voice->amp_level) / UINT32_MAX);
+                component = (short)(((int64_t)component * (int64_t)voice->amp_level) / UINT32_MAX);
 
-            amplitude += (short)(mix_gain * component);
+                amplitude += (short)(mix_gain * component);
+
+                // Increment phase
+                voice->phase += voice->tune;
+                envelope_tick(voice);
+            }
 
             // Write stereo samples
             buffer[i] = amplitude;
             buffer[i+1] = amplitude;
-
-            // Increment phase
-            voice->phase += voice->tune;
-            envelope_tick();
         }
     }
 }
@@ -478,9 +480,8 @@ static void graphics_draw(void)
 	display_show(disp);
 }
 
-static void envelope_tick(void)
+static void envelope_tick(voice_t * voice)
 {
-    voice_t * voice = &voices[0];
     switch (voice->amp_env_state)
     {
         case IDLE:
