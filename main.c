@@ -106,7 +106,6 @@ static uint8_t midi_in_buffer[31] = {0};
 static enum oscillator_type_e osc_type = SINE;
 static struct envelope_s amp_env;
 static voice_t voices[POLYPHONY_COUNT];
-static size_t active_voice_count = 0;
 
 ///
 /// STATIC PROTOTYPES
@@ -521,7 +520,6 @@ static void envelope_tick(voice_t * voice)
                 {
                     voice->amp_level = 0;
                     voice->amp_env_state = IDLE;
-                    --active_voice_count;
                 }
                 else
                 {
@@ -696,30 +694,23 @@ static voice_t * find_next_voice(void)
 {
     voice_t * voice = NULL;
 
-    if (active_voice_count < POLYPHONY_COUNT)
+    size_t oldest_voice_idx = 0;
+    for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
     {
-        // There is a free voice, find one that's idle
-        for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
+        if (IDLE == voices[voice_idx].amp_env_state)
         {
-            if (IDLE == voices[voice_idx].amp_env_state)
-            {
-                voice = &voices[voice_idx];
-                break;
-            }
+            voice = &voices[voice_idx];
+            break;
         }
-        active_voice_count++;
+        else if (voices[voice_idx].timestamp < voices[oldest_voice_idx].timestamp)
+        {
+            oldest_voice_idx = voice_idx;
+        }
     }
-    else
+
+    if (!voice)
     {
-        // Find the oldest voice
-        voice = &voices[0];
-        for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
-        {
-            if (voices[voice_idx].timestamp < voice->timestamp)
-            {
-                voice = &voices[voice_idx];
-            }
-        }
+        voice = &voices[oldest_voice_idx];
     }
 
     return voice;
@@ -727,22 +718,17 @@ static voice_t * find_next_voice(void)
 
 static voice_t * find_voice_to_close(uint8_t note)
 {
-    voice_t * voice = &voices[0];
+    voice_t * voice = NULL;
 
     // Find the oldest voice that matches the note
     for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
     {
         if ((note == voices[voice_idx].note)
-            && (voices[voice_idx].timestamp < voice->timestamp))
+            && ((IDLE != voices[voice_idx].amp_env_state) && RELEASE != voices[voice_idx].amp_env_state)
+            && ((!voice)|| (voices[voice_idx].timestamp < voice->timestamp)))
         {
             voice = &voices[voice_idx];
         }
-    }
-
-    // Ensure the note actually matches in case the loop didn't find this note
-    if (note != voice->note)
-    {
-        voice = NULL;
     }
 
     return voice;
@@ -763,7 +749,6 @@ static void handle_midi_input(size_t midi_in_bytes)
         if ((MIDI_NOTE_OFF == msg.status)
             || ((MIDI_NOTE_ON == msg.status) && (0 == msg.data[1])))
         {
-            // TODO: Find voice to close
             voice_t * voice = find_voice_to_close(msg.data[0]);
             if (voice)
             {
