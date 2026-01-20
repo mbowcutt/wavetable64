@@ -28,7 +28,7 @@ struct envelope_s
 
 typedef struct
 {
-    enum oscillator_type_e osc;
+    short * osc_ptr;
     uint8_t note;
     uint32_t phase;
     uint32_t tune;

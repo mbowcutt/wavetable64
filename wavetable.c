@@ -17,14 +17,13 @@
 #define ACCUMULATOR_BITS 32
 #define FRAC_BITS (ACCUMULATOR_BITS - WT_BIT_DEPTH)
 
-static bool wavetable_generate_all(void);
-static short * wavetable_generate_sine(float * sum_squares);
-static short * wavetable_generate_square(float target_rms, size_t num_harmonics);
-static short * wavetable_generate_triangle(float target_rms, size_t num_harmonics);
-static short * wavetable_generate_ramp(float target_rms, size_t num_harmonics);
+static void wavetable_generate_all(void);
+static void wavetable_generate_sine(float * sum_squares);
+static void wavetable_generate_square(float target_rms, size_t num_harmonics);
+static void wavetable_generate_triangle(float target_rms, size_t num_harmonics);
+static void wavetable_generate_ramp(float target_rms, size_t num_harmonics);
 
 static void wavetable_normalize(short * lut,
-                                float * temp_lut,
                                 float target_rms,
                                 float sum_squares);
 
@@ -39,8 +38,22 @@ static void wavetable_generate_midi_freq_tbl(void);
 // static short square_component(uint32_t const phase);
 // static short ramp_component(uint32_t const phase);
 
-static short * osc_wave_tables[NUM_OSCILLATORS];
 static float midi_freq_lut[MIDI_NOTE_MAX];
+
+static short sine_tbl[WT_SIZE + 1];
+static short square_tbl[WT_SIZE + 1];
+static short triangle_tbl[WT_SIZE + 1];
+static short ramp_tbl[WT_SIZE + 1];
+static float temp_tbl[WT_SIZE];
+
+static short * osc_wave_tables[NUM_OSCILLATORS] =
+{
+    sine_tbl,
+    square_tbl,
+    triangle_tbl,
+    ramp_tbl
+};
+
 
 void wavetable_init(void)
 {
@@ -54,62 +67,28 @@ short * wavetable_get(enum oscillator_type_e osc)
 }
 
 
-static bool wavetable_generate_all(void)
+static void wavetable_generate_all(void)
 {
-    bool status = true;
     float sum_squares = 0;
-    float target_rms = 0;
 
     gui_splash(GEN_SINE);
-    osc_wave_tables[SINE] = wavetable_generate_sine(&sum_squares);
-    if (!osc_wave_tables[SINE])
-    {
-        status = false;
-    }
-    else
-    {
-        target_rms = 0.5f * sqrtf(sum_squares/WT_SIZE);
-    }
+    wavetable_generate_sine(&sum_squares);
+    float target_rms = 0.5f * sqrtf(sum_squares/WT_SIZE);
 
     size_t const num_harmonics = 120;
-    if (status)
-    {
-        gui_splash(GEN_SQUARE);
-        osc_wave_tables[SQUARE] = wavetable_generate_square(target_rms, num_harmonics);
-        if (!osc_wave_tables[SQUARE])
-        {
-            status = false;
-        }
-    }
 
-    if (status)
-    {
-        gui_splash(GEN_TRIANGLE);
-        osc_wave_tables[TRIANGLE] = wavetable_generate_triangle(target_rms, num_harmonics);
-        if (!osc_wave_tables[TRIANGLE])
-        {
-            status = false;
-        }
-    }
+    gui_splash(GEN_SQUARE);
+    wavetable_generate_square(target_rms, num_harmonics);
 
-    if (status)
-    {
-        gui_splash(GEN_RAMP);
-        osc_wave_tables[RAMP] = wavetable_generate_ramp(target_rms, num_harmonics);
-        if (!osc_wave_tables[RAMP])
-        {
-            status = false;
-        }
-    }
+    gui_splash(GEN_TRIANGLE);
+    wavetable_generate_triangle(target_rms, num_harmonics);
 
-    return status;
+    gui_splash(GEN_RAMP);
+    wavetable_generate_ramp(target_rms, num_harmonics);
 }
 
-static short * wavetable_generate_sine(float * sum_squares)
+static void wavetable_generate_sine(float * sum_squares)
 {
-    short * lut = malloc((WT_SIZE + 1) * sizeof(short));
-    if (!lut) return NULL;
-
     float const phase_step = (2.0f * M_PI) / WT_SIZE;
 
     for (size_t i = 0; i < WT_SIZE; ++i)
@@ -117,98 +96,72 @@ static short * wavetable_generate_sine(float * sum_squares)
         float temp = sinf((float)i * phase_step);
         (*sum_squares) += temp * temp;
 
-        lut[i] = (short)(INT16_MAX/2 * temp);
+        sine_tbl[i] = (short)(INT16_MAX/2 * temp);
     }
 
-    lut[WT_SIZE] = lut[0];
-
-    return lut;
+    sine_tbl[WT_SIZE] = sine_tbl[0];
 }
 
-static short * wavetable_generate_square(float target_rms, size_t num_harmonics)
+static void wavetable_generate_square(float target_rms, size_t num_harmonics)
 {
-    short * lut = malloc((WT_SIZE + 1) * sizeof(short));
-    if (!lut) return NULL;
-    float * temp_lut = malloc(WT_SIZE * sizeof(float));
-    if (!lut) return NULL;
-
     float const phase_step = (2.0f * M_PI) / WT_SIZE;
 
     float sum_squares = 0;
 
     for (size_t i = 0; i < WT_SIZE; ++i)
     {
-        temp_lut[i] = 0;
+        temp_tbl[i] = 0;
         for (size_t h = 1; h <= num_harmonics; h+=2)
         {
-            temp_lut[i] += sinf((float)i * phase_step * h) / h;
+            temp_tbl[i] += sinf((float)i * phase_step * h) / h;
         }
-        sum_squares += temp_lut[i] * temp_lut[i];
+        sum_squares += temp_tbl[i] * temp_tbl[i];
     }
 
-    wavetable_normalize(lut, temp_lut, target_rms, sum_squares);
-    free(temp_lut);
-
-    return lut;
+    wavetable_normalize(square_tbl, target_rms, sum_squares);
 }
 
-static short * wavetable_generate_triangle(float target_rms, size_t num_harmonics)
+static void wavetable_generate_triangle(float target_rms, size_t num_harmonics)
 {
-    short * lut = malloc((WT_SIZE + 1) * sizeof(short));
-    if (!lut) return NULL;
-    float * temp_lut = malloc(WT_SIZE * sizeof(float));
-    if (!lut) return NULL;
-
     float const phase_step = (2.0f * M_PI) / WT_SIZE;
 
     float sum_squares = 0;
 
     for (size_t i = 0; i < WT_SIZE; ++i)
     {
-        temp_lut[i] = 0;
+        temp_tbl[i] = 0;
         float sign = 1.0f;
         for (size_t h = 1; h <= num_harmonics; h+=2)
         {
-            temp_lut[i] += (sign * sinf((float)i * phase_step * h) / (float)(h * h));
+            temp_tbl[i] += (sign * sinf((float)i * phase_step * h) / (float)(h * h));
             sign *= -1.0f;
         }
-        sum_squares += temp_lut[i] * temp_lut[i];
+        sum_squares += temp_tbl[i] * temp_tbl[i];
     }
 
-    wavetable_normalize(lut, temp_lut, target_rms, sum_squares);
-    free(temp_lut);
-
-    return lut;
+    wavetable_normalize(triangle_tbl, target_rms, sum_squares);
 }
 
-static short * wavetable_generate_ramp(float target_rms, size_t num_harmonics)
+static void wavetable_generate_ramp(float target_rms, size_t num_harmonics)
 {
-    short * lut = malloc((WT_SIZE + 1) * sizeof(short));
-    if (!lut) return NULL;
-    float * temp_lut = malloc(WT_SIZE * sizeof(float));
-    if (!lut) return NULL;
-
     float const phase_step = (2.0f * M_PI) / WT_SIZE;
 
     float sum_squares = 0;
 
     for (size_t i = 0; i < WT_SIZE; ++i)
     {
-        temp_lut[i] = 0;
+        temp_tbl[i] = 0;
         for (size_t h = 1; h <= num_harmonics; ++h)
         {
-            temp_lut[i] += sinf((float)i * phase_step * h) / (float)h;
+            temp_tbl[i] += sinf((float)i * phase_step * h) / (float)h;
         }
-        sum_squares += temp_lut[i] * temp_lut[i];
+        sum_squares += temp_tbl[i] * temp_tbl[i];
     }
 
-    wavetable_normalize(lut, temp_lut, target_rms, sum_squares);
-    free(temp_lut);
-
-    return lut;
+    wavetable_normalize(ramp_tbl, target_rms, sum_squares);
 }
 
-static void wavetable_normalize(short * lut, float * temp_lut, float target_rms, float sum_squares)
+static void wavetable_normalize(short * lut, float target_rms, float sum_squares)
 {
     float const rms = sqrtf(sum_squares / WT_SIZE);
     float const scale = target_rms / rms;
@@ -217,7 +170,7 @@ static void wavetable_normalize(short * lut, float * temp_lut, float target_rms,
 
     for (size_t i = 0; i < WT_SIZE; ++i)
     {
-        lut[i] = (short)(INT16_MAX * temp_lut[i] * scale);
+        lut[i] = (short)(INT16_MAX * temp_tbl[i] * scale);
     }
 
     lut[WT_SIZE] = lut[0];

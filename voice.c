@@ -22,7 +22,7 @@ void voice_init(void)
     for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
     {
         voice_t * voice = &voices[voice_idx];
-        voice->osc = SINE;
+        voice->osc_ptr = wavetable_get(SINE);
         voice->note = 0u;
         voice->phase = 0u;
         voice->tune = 0u;

@@ -74,8 +74,8 @@ static void audio_engine_write_buffer(short * buffer, size_t const num_samples)
                 if (IDLE == voice->amp_env_state)
                     continue;
 
-                short component = wavetable_get_amplitude(voice->phase, 
-                                                          wavetable_get(voice->osc));
+                short component = wavetable_get_amplitude(voice->phase,
+                                                          voice->osc_ptr);
 
                 component = (short)(((int64_t)component * (int64_t)voice->amp_level) / UINT32_MAX);
 
