@@ -18,14 +18,21 @@
 #define FRAC_BITS (ACCUMULATOR_BITS - WT_BIT_DEPTH)
 
 
-static short * generate_sine_lut(float * sum_squares);
-static short * generate_square_lut(float target_rms, size_t num_harmonics);
-static short * generate_triangle_lut(float target_rms, size_t num_harmonics);
-static short * generate_ramp_lut(float target_rms, size_t num_harmonics);
+static short * wavetable_generate_sine(float * sum_squares);
+static short * wavetable_generate_square(float target_rms, size_t num_harmonics);
+static short * wavetable_generate_triangle(float target_rms, size_t num_harmonics);
+static short * wavetable_generate_ramp(float target_rms, size_t num_harmonics);
 
-static void rms_normalize(short * lut, float * temp_lut, float target_rms, float sum_squares);
+static void wavetable_normalize(short * lut,
+                                float * temp_lut,
+                                float target_rms,
+                                float sum_squares);
 
-static void generate_midi_freq_tbl(void);
+static short wavetable_interpolate(int16_t const y0,
+                                   int16_t const y1,
+                                   uint32_t const frac);
+
+static void wavetable_generate_midi_freq_tbl(void);
 
 // TODO: Support direct (not wavetable) synthesis
 // static short triangle_component(uint32_t const phase);
@@ -42,16 +49,16 @@ short * wavetable_get(enum oscillator_type_e osc)
 }
 
 
-bool generate_wave_tables(void)
+bool wavetable_generate_all(void)
 {
     bool status = true;
     float sum_squares = 0;
     float target_rms = 0;
 
-    generate_midi_freq_tbl();
+    wavetable_generate_midi_freq_tbl();
 
     draw_splash(GEN_SINE);
-    osc_wave_tables[SINE] = generate_sine_lut(&sum_squares);
+    osc_wave_tables[SINE] = wavetable_generate_sine(&sum_squares);
     if (!osc_wave_tables[SINE])
     {
         status = false;
@@ -65,7 +72,7 @@ bool generate_wave_tables(void)
     if (status)
     {
         draw_splash(GEN_SQUARE);
-        osc_wave_tables[SQUARE] = generate_square_lut(target_rms, num_harmonics);
+        osc_wave_tables[SQUARE] = wavetable_generate_square(target_rms, num_harmonics);
         if (!osc_wave_tables[SQUARE])
         {
             status = false;
@@ -75,7 +82,7 @@ bool generate_wave_tables(void)
     if (status)
     {
         draw_splash(GEN_TRIANGLE);
-        osc_wave_tables[TRIANGLE] = generate_triangle_lut(target_rms, num_harmonics);
+        osc_wave_tables[TRIANGLE] = wavetable_generate_triangle(target_rms, num_harmonics);
         if (!osc_wave_tables[TRIANGLE])
         {
             status = false;
@@ -85,7 +92,7 @@ bool generate_wave_tables(void)
     if (status)
     {
         draw_splash(GEN_RAMP);
-        osc_wave_tables[RAMP] = generate_ramp_lut(target_rms, num_harmonics);
+        osc_wave_tables[RAMP] = wavetable_generate_ramp(target_rms, num_harmonics);
         if (!osc_wave_tables[RAMP])
         {
             status = false;
@@ -95,7 +102,7 @@ bool generate_wave_tables(void)
     return status;
 }
 
-static short * generate_sine_lut(float * sum_squares)
+static short * wavetable_generate_sine(float * sum_squares)
 {
     short * lut = malloc((WT_SIZE + 1) * sizeof(short));
     if (!lut) return NULL;
@@ -115,7 +122,7 @@ static short * generate_sine_lut(float * sum_squares)
     return lut;
 }
 
-static short * generate_square_lut(float target_rms, size_t num_harmonics)
+static short * wavetable_generate_square(float target_rms, size_t num_harmonics)
 {
     short * lut = malloc((WT_SIZE + 1) * sizeof(short));
     if (!lut) return NULL;
@@ -136,13 +143,13 @@ static short * generate_square_lut(float target_rms, size_t num_harmonics)
         sum_squares += temp_lut[i] * temp_lut[i];
     }
 
-    rms_normalize(lut, temp_lut, target_rms, sum_squares);
+    wavetable_normalize(lut, temp_lut, target_rms, sum_squares);
     free(temp_lut);
 
     return lut;
 }
 
-static short * generate_triangle_lut(float target_rms, size_t num_harmonics)
+static short * wavetable_generate_triangle(float target_rms, size_t num_harmonics)
 {
     short * lut = malloc((WT_SIZE + 1) * sizeof(short));
     if (!lut) return NULL;
@@ -165,13 +172,13 @@ static short * generate_triangle_lut(float target_rms, size_t num_harmonics)
         sum_squares += temp_lut[i] * temp_lut[i];
     }
 
-    rms_normalize(lut, temp_lut, target_rms, sum_squares);
+    wavetable_normalize(lut, temp_lut, target_rms, sum_squares);
     free(temp_lut);
 
     return lut;
 }
 
-static short * generate_ramp_lut(float target_rms, size_t num_harmonics)
+static short * wavetable_generate_ramp(float target_rms, size_t num_harmonics)
 {
     short * lut = malloc((WT_SIZE + 1) * sizeof(short));
     if (!lut) return NULL;
@@ -192,13 +199,13 @@ static short * generate_ramp_lut(float target_rms, size_t num_harmonics)
         sum_squares += temp_lut[i] * temp_lut[i];
     }
 
-    rms_normalize(lut, temp_lut, target_rms, sum_squares);
+    wavetable_normalize(lut, temp_lut, target_rms, sum_squares);
     free(temp_lut);
 
     return lut;
 }
 
-static void rms_normalize(short * lut, float * temp_lut, float target_rms, float sum_squares)
+static void wavetable_normalize(short * lut, float * temp_lut, float target_rms, float sum_squares)
 {
     float const rms = sqrtf(sum_squares / WT_SIZE);
     float const scale = target_rms / rms;
@@ -213,20 +220,20 @@ static void rms_normalize(short * lut, float * temp_lut, float target_rms, float
     lut[WT_SIZE] = lut[0];
 }
 
-uint32_t get_tune(uint8_t const note)
+uint32_t wavetable_get_tune(uint8_t const note)
 {
     return (uint32_t)((midi_freq_lut[note] * ((uint64_t)1 << ACCUMULATOR_BITS)) / SAMPLE_RATE);
 }
 
-short interpolate_delta(int16_t const y0,
-                        int16_t const y1,
-                        uint32_t const frac)
+short wavetable_interpolate(int16_t const y0,
+                            int16_t const y1,
+                            uint32_t const frac)
 {
 
     return (short) (((int64_t)((int32_t)(y1 - y0) * (int32_t)frac)) >> FRAC_BITS);
 }
 
-short phase_to_amplitude(uint32_t const component_phase, short * wave_table)
+short wavetable_get_amplitude(uint32_t const component_phase, short * wave_table)
 {
     uint16_t const phase_int = (uint16_t const)((component_phase) >> FRAC_BITS);
     uint32_t const phase_frac = (uint32_t const)(component_phase & ((1 << FRAC_BITS) - 1));
@@ -234,7 +241,7 @@ short phase_to_amplitude(uint32_t const component_phase, short * wave_table)
     short const y0 = wave_table[phase_int];
     short const y1 = wave_table[phase_int + 1];
 
-    return y0 + interpolate_delta(y0, y1, phase_frac);
+    return y0 + wavetable_interpolate(y0, y1, phase_frac);
 }
 
 // static short triangle_component(uint32_t const phase)
@@ -265,7 +272,7 @@ short phase_to_amplitude(uint32_t const component_phase, short * wave_table)
 //     return (short)((phase) >> 16);
 // }
 
-static void generate_midi_freq_tbl(void)
+static void wavetable_generate_midi_freq_tbl(void)
 {
     for (int idx = 0; idx < MIDI_NOTE_MAX; ++idx)
     {

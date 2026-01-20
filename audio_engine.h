@@ -6,7 +6,7 @@
 #define SAMPLE_RATE 44100
 
 void audio_engine_init(void);
-void audio_buffer_run(void);
+void audio_engine_run(void);
 
 
 #endif

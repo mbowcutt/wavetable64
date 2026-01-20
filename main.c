@@ -17,7 +17,7 @@ int main(void)
     debug_init_isviewer();
     debug_init_usblog();
 
-    if (!generate_wave_tables())
+    if (!wavetable_generate_all())
     {
         return -1;
     }
@@ -25,18 +25,18 @@ int main(void)
     draw_splash(GEN_FREQ_TBL);
 
     draw_splash(INIT_AUDIO);
-    init_voices();
+    voice_init();
     audio_engine_init();
 
-    graphics_draw();
+    display_draw();
 
 	while(1) {
         if (input_poll_and_handle())
         {
-            graphics_draw();
+            display_draw();
         }
 
-        audio_buffer_run();
+        audio_engine_run();
     }
 
     // if (mix_buffer) free(mix_buffer);

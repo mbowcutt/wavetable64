@@ -12,7 +12,7 @@
 
 #define NUM_AUDIO_BUFFERS 4
 
-static void write_ai_buffer(short * buffer, size_t const num_samples);
+static void audio_engine_write_buffer(short * buffer, size_t const num_samples);
 
 static short * mix_buffer = NULL;
 static bool mix_buffer_full = false;
@@ -33,9 +33,10 @@ void audio_engine_init(void)
     }
 }
 
-void audio_buffer_run(void)
+void audio_engine_run(void)
 {
-    if (audio_can_write()) {
+    if (audio_can_write())
+    {
         short * buffer = audio_write_begin();
         if (buffer)
         {
@@ -46,19 +47,19 @@ void audio_buffer_run(void)
             }
             else
             {
-                write_ai_buffer(buffer, audio_get_buffer_length());
+                audio_engine_write_buffer(buffer, audio_get_buffer_length());
             }
         }
         audio_write_end();
     }
     else if (!mix_buffer_full)
     {
-        write_ai_buffer(mix_buffer, audio_get_buffer_length());
+        audio_engine_write_buffer(mix_buffer, audio_get_buffer_length());
         mix_buffer_full = true;
     }
 }
 
-static void write_ai_buffer(short * buffer, size_t const num_samples)
+static void audio_engine_write_buffer(short * buffer, size_t const num_samples)
 {
     if (buffer && (num_samples > 0))
     {
@@ -73,7 +74,8 @@ static void write_ai_buffer(short * buffer, size_t const num_samples)
                 if (IDLE == voice->amp_env_state)
                     continue;
 
-                short component = phase_to_amplitude(voice->phase, wavetable_get(voice->osc));
+                short component = wavetable_get_amplitude(voice->phase, 
+                                                          wavetable_get(voice->osc));
 
                 component = (short)(((int64_t)component * (int64_t)voice->amp_level) / UINT32_MAX);
 
@@ -81,7 +83,7 @@ static void write_ai_buffer(short * buffer, size_t const num_samples)
 
                 // Increment phase
                 voice->phase += voice->tune;
-                envelope_tick(voice);
+                voice_envelope_tick(voice);
             }
 
             // Write stereo samples

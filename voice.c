@@ -12,7 +12,7 @@ static voice_t voices[POLYPHONY_COUNT];
 
 static struct envelope_s amp_env;
 
-void init_voices(void)
+void voice_init(void)
 {
     amp_env.attack_samples = SAMPLE_RATE;  // 1 second attack
     amp_env.decay_samples = SAMPLE_RATE;   // 1 second decay
@@ -38,7 +38,7 @@ voice_t * voice_get(size_t voice_idx)
     return &voices[voice_idx];
 }
 
-voice_t * find_next_voice(void)
+voice_t * voice_find_next(void)
 {
     voice_t * voice = NULL;
 
@@ -64,7 +64,7 @@ voice_t * find_next_voice(void)
     return voice;
 }
 
-voice_t * find_voice_to_close(uint8_t note)
+voice_t * voice_find_for_note_off(uint8_t note)
 {
     voice_t * voice = NULL;
 
@@ -82,7 +82,7 @@ voice_t * find_voice_to_close(uint8_t note)
     return voice;
 }
 
-void envelope_tick(voice_t * voice)
+void voice_envelope_tick(voice_t * voice)
 {
     switch (voice->amp_env_state)
     {
@@ -136,16 +136,16 @@ void envelope_tick(voice_t * voice)
     }
 }
 
-void note_on(voice_t * voice, uint8_t note)
+void voice_note_on(voice_t * voice, uint8_t note)
 {
     voice->note = note;
-    voice->tune = get_tune(note);
+    voice->tune = wavetable_get_tune(note);
     voice->amp_env_state = ATTACK;
     voice->amp_env_rate = (UINT32_MAX - voice->amp_level) / amp_env.attack_samples;
     voice->timestamp = get_ticks();
 }
 
-void note_off(voice_t * voice)
+void voice_note_off(voice_t * voice)
 {
     if (IDLE != voice->amp_env_state)
     {

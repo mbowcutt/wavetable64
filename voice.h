@@ -38,12 +38,12 @@ typedef struct
     uint64_t timestamp;
 } voice_t;
 
-void init_voices(void);
+void voice_init(void);
 voice_t * voice_get(size_t voice_idx);
-voice_t * find_next_voice(void);
-voice_t * find_voice_to_close(uint8_t note);
-void envelope_tick(voice_t * voice);
-void note_on(voice_t * voice, uint8_t note);
-void note_off(voice_t * voice);
+voice_t * voice_find_next(void);
+voice_t * voice_find_for_note_off(uint8_t note);
+void voice_envelope_tick(voice_t * voice);
+void voice_note_on(voice_t * voice, uint8_t note);
+void voice_note_off(voice_t * voice);
 
 #endif

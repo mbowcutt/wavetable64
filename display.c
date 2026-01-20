@@ -8,7 +8,7 @@
 
 // static char * get_osc_type_str(void);
 
-void graphics_draw(void)
+void display_draw(void)
 {
     // static char str_osc[64] = {0};
     // snprintf(str_osc, 64, "Oscillator: %s", get_osc_type_str());
