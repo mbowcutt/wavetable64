@@ -1,6 +1,6 @@
 #include "audio_engine.h"
 
-#include "display.h"
+#include "gui.h"
 #include "init.h"
 #include "voice.h"
 #include "wavetable.h"
@@ -24,7 +24,7 @@ void audio_engine_init(void)
 {
     audio_init(SAMPLE_RATE, NUM_AUDIO_BUFFERS);
 
-    draw_splash(ALLOC_MIX_BUF);
+    gui_splash(ALLOC_MIX_BUF);
     mix_buffer_len = 2 * audio_get_buffer_length() * sizeof(short);
     mix_buffer = malloc(mix_buffer_len);
     if (!mix_buffer)

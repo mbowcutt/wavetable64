@@ -13,6 +13,11 @@ static uint8_t midi_in_buffer[MIDI_RX_PAYLOAD] = {0};
 
 static void input_handle_midi(size_t midi_in_bytes);
 
+void input_init(void)
+{
+    joypad_init();
+}
+
 bool input_poll_and_handle(void)
 {
     midi_in_bytes = midi_rx_poll(JOYPAD_PORT_1,

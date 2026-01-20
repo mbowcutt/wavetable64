@@ -1,7 +1,7 @@
 #include "wavetable.h"
 
 #include "audio_engine.h"
-#include "display.h"
+#include "gui.h"
 #include "init.h"
 
 #include <libdragon.h>
@@ -17,7 +17,7 @@
 #define ACCUMULATOR_BITS 32
 #define FRAC_BITS (ACCUMULATOR_BITS - WT_BIT_DEPTH)
 
-
+static bool wavetable_generate_all(void);
 static short * wavetable_generate_sine(float * sum_squares);
 static short * wavetable_generate_square(float target_rms, size_t num_harmonics);
 static short * wavetable_generate_triangle(float target_rms, size_t num_harmonics);
@@ -42,6 +42,11 @@ static void wavetable_generate_midi_freq_tbl(void);
 static short * osc_wave_tables[NUM_OSCILLATORS];
 static float midi_freq_lut[MIDI_NOTE_MAX];
 
+void wavetable_init(void)
+{
+    wavetable_generate_all();
+    wavetable_generate_midi_freq_tbl();
+}
 
 short * wavetable_get(enum oscillator_type_e osc)
 {
@@ -49,15 +54,13 @@ short * wavetable_get(enum oscillator_type_e osc)
 }
 
 
-bool wavetable_generate_all(void)
+static bool wavetable_generate_all(void)
 {
     bool status = true;
     float sum_squares = 0;
     float target_rms = 0;
 
-    wavetable_generate_midi_freq_tbl();
-
-    draw_splash(GEN_SINE);
+    gui_splash(GEN_SINE);
     osc_wave_tables[SINE] = wavetable_generate_sine(&sum_squares);
     if (!osc_wave_tables[SINE])
     {
@@ -71,7 +74,7 @@ bool wavetable_generate_all(void)
     size_t const num_harmonics = 120;
     if (status)
     {
-        draw_splash(GEN_SQUARE);
+        gui_splash(GEN_SQUARE);
         osc_wave_tables[SQUARE] = wavetable_generate_square(target_rms, num_harmonics);
         if (!osc_wave_tables[SQUARE])
         {
@@ -81,7 +84,7 @@ bool wavetable_generate_all(void)
 
     if (status)
     {
-        draw_splash(GEN_TRIANGLE);
+        gui_splash(GEN_TRIANGLE);
         osc_wave_tables[TRIANGLE] = wavetable_generate_triangle(target_rms, num_harmonics);
         if (!osc_wave_tables[TRIANGLE])
         {
@@ -91,7 +94,7 @@ bool wavetable_generate_all(void)
 
     if (status)
     {
-        draw_splash(GEN_RAMP);
+        gui_splash(GEN_RAMP);
         osc_wave_tables[RAMP] = wavetable_generate_ramp(target_rms, num_harmonics);
         if (!osc_wave_tables[RAMP])
         {

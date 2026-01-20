@@ -1,4 +1,4 @@
-#include "display.h"
+#include "gui.h"
 
 #include "init.h"
 
@@ -8,7 +8,13 @@
 
 // static char * get_osc_type_str(void);
 
-void display_draw(void)
+void gui_init(void)
+{
+    display_init(RESOLUTION_512x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
+    gui_splash(INIT);
+}
+
+void gui_draw(void)
 {
     // static char str_osc[64] = {0};
     // snprintf(str_osc, 64, "Oscillator: %s", get_osc_type_str());
@@ -45,7 +51,7 @@ void display_draw(void)
 	display_show(disp);
 }
 
-void draw_splash(enum init_state_e init_state)
+void gui_splash(enum init_state_e init_state)
 {
     display_context_t disp = display_get();
     graphics_fill_screen(disp, 0);
