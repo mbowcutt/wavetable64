@@ -1,12 +1,12 @@
 BUILD_DIR=build
 include $(N64_INST)/include/n64.mk
 
-OBJS = $(BUILD_DIR)/main.o \
-       $(BUILD_DIR)/audio_engine.o \
-       $(BUILD_DIR)/gui.o \
-       $(BUILD_DIR)/input.o \
-       $(BUILD_DIR)/voice.o \
-       $(BUILD_DIR)/wavetable.o
+OBJS = $(BUILD_DIR)/src/main.o \
+       $(BUILD_DIR)/src/audio_engine.o \
+       $(BUILD_DIR)/src/gui.o \
+       $(BUILD_DIR)/src/input.o \
+       $(BUILD_DIR)/src/voice.o \
+       $(BUILD_DIR)/src/wavetable.o
 
 AUDIOCONV_FLAGS ?=
 
