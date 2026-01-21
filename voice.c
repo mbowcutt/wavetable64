@@ -4,13 +4,19 @@
 #include "wavetable.h"
 
 #include <n64sys.h>
+#include <midi.h>
 
+#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 
 static voice_t voices[POLYPHONY_COUNT];
 
 static struct envelope_s amp_env;
+
+static uint32_t env_sample_lut[MIDI_MAX_DATA_BYTE + 1] = {0};
+
+static void init_env_sample_lut(float t_min, float t_max);
 
 void voice_init(void)
 {
@@ -30,6 +36,17 @@ void voice_init(void)
         voice->amp_level = 0u;
         voice->amp_env_rate = 0u;
         voice->timestamp = 0u;
+    }
+
+    init_env_sample_lut(0.005f, 10.0f);
+}
+
+static void init_env_sample_lut(float t_min, float t_max)
+{
+    for (size_t idx = 0; idx <= MIDI_MAX_DATA_BYTE; ++idx)
+    {
+        float seconds = t_min * powf(t_max / t_min, (float)idx / 127.0f);
+        env_sample_lut[idx] = (uint32_t)(seconds * SAMPLE_RATE);
     }
 }
 
@@ -95,7 +112,7 @@ void voice_envelope_tick(voice_t * voice)
                 {
                     voice->amp_level = UINT32_MAX;
                     voice->amp_env_state = DECAY;
-                    // TODO: Implement decay rate
+                    voice->amp_env_rate = (UINT32_MAX - amp_env.sustain_level) / amp_env.decay_samples;
                 }
                 else
                 {
@@ -106,11 +123,15 @@ void voice_envelope_tick(voice_t * voice)
         case DECAY:
             if (amp_env.sustain_level < voice->amp_level)
             {
-                voice->amp_level -= voice->amp_env_rate;
-                if (amp_env.sustain_level >= voice->amp_level)
+                if ((amp_env.sustain_level >= voice->amp_level)
+                    || voice->amp_env_rate > voice->amp_level)
                 {
                     voice->amp_level = amp_env.sustain_level;
                     voice->amp_env_state = SUSTAIN;
+                }
+                else
+                {
+                    voice->amp_level -= voice->amp_env_rate;
                 }
             }
             break;
@@ -130,10 +151,41 @@ void voice_envelope_tick(voice_t * voice)
                 }
             }
             break;
-        case NUM_envelope_sTATES:
+        case NUM_ENVELOPE_STATES:
         default:
             break;
     }
+}
+
+void voice_envelope_set_attack(uint8_t value)
+{
+    amp_env.attack_samples = env_sample_lut[value];
+}
+
+void voice_envelope_set_decay(uint8_t value)
+{
+    amp_env.decay_samples = env_sample_lut[value];
+}
+
+void voice_envelope_set_sustain(uint8_t value)
+{
+    if (0 == value)
+    {
+        amp_env.sustain_level = 0;
+    }
+    else if (127 == value)
+    {
+        amp_env.sustain_level = UINT32_MAX;
+    }
+    else
+    {
+        amp_env.sustain_level = (uint32_t)(UINT32_MAX * ((float)value / 127.0f));
+    }
+}
+
+void voice_envelope_set_release(uint8_t value)
+{
+    amp_env.release_samples = env_sample_lut[value];
 }
 
 void voice_note_on(voice_t * voice, uint8_t note)

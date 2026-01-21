@@ -48,10 +48,10 @@ void input_handle_midi(size_t midi_in_bytes)
     {
         midi_msg msg = msg_buf[msg_idx];
 
-        if ((MIDI_NOTE_OFF == msg.status)
-            || ((MIDI_NOTE_ON == msg.status) && (0 == msg.data[1])))
+        if ((MIDI_NOTE_OFF == (msg.status & 0xF0))
+            || ((MIDI_NOTE_ON == (msg.status & 0xF0)) && (0 == msg.data[1])))
         {
-            if (msg.data[0] >= MIDI_NOTE_MAX)
+            if (msg.data[0] >= MIDI_MAX_DATA_BYTE)
                 continue;
             voice_t * voice = voice_find_for_note_off(msg.data[0]);
             if (voice)
@@ -59,13 +59,31 @@ void input_handle_midi(size_t midi_in_bytes)
                 voice_note_off(voice);
             }
         }
-        else if (MIDI_NOTE_ON == msg.status)
+        else if (MIDI_NOTE_ON == (msg.status & 0xF0))
         {
-            if (msg.data[0] >= MIDI_NOTE_MAX)
+            if (msg.data[0] >= MIDI_MAX_DATA_BYTE)
                 continue;
             // TODO: Handle velocity
             voice_t * voice = voice_find_next();
             voice_note_on(voice, msg.data[0]);
+        }
+        else if (MIDI_CONTROL_CHANGE == (msg.status & 0xF0))
+        {
+            switch (msg.data[0])
+            {
+                case 14:
+                    voice_envelope_set_attack(msg.data[1]);
+                    break;
+                case 15:
+                    voice_envelope_set_decay(msg.data[1]);
+                    break;
+                case 13:
+                    voice_envelope_set_sustain(msg.data[1]);
+                    break;
+                case 12:
+                    voice_envelope_set_release(msg.data[1]);
+                    break;
+            }
         }
     }
 }

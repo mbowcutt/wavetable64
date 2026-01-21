@@ -38,7 +38,7 @@ static void wavetable_generate_midi_freq_tbl(void);
 // static short square_component(uint32_t const phase);
 // static short ramp_component(uint32_t const phase);
 
-static float midi_freq_lut[MIDI_NOTE_MAX];
+static float midi_freq_lut[MIDI_MAX_DATA_BYTE + 1];
 
 static short sine_tbl[WT_SIZE + 1];
 static short square_tbl[WT_SIZE + 1];
@@ -230,7 +230,7 @@ short wavetable_get_amplitude(uint32_t const component_phase, short * wave_table
 
 static void wavetable_generate_midi_freq_tbl(void)
 {
-    for (int idx = 0; idx < MIDI_NOTE_MAX; ++idx)
+    for (int idx = 0; idx <= MIDI_MAX_DATA_BYTE; ++idx)
     {
         midi_freq_lut[idx] = 440.0f * powf(2.0f, ((float)idx - 69) / 12.0f);
     }
