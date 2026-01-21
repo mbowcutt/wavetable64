@@ -10,11 +10,6 @@ OBJS = $(BUILD_DIR)/main.o \
 
 AUDIOCONV_FLAGS ?=
 
-# Rule to compile C files into object files
-$(BUILD_DIR)/%.o: %.c
-	@mkdir -p $(dir $@)
-	$(CC) $(N64_CFLAGS) -c -o $@ $<
-
 all: wavtable64.z64
 
 $(BUILD_DIR)/wavtable64.elf: $(OBJS)
