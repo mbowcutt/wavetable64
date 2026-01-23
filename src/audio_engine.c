@@ -65,7 +65,7 @@ static void audio_engine_write_buffer(short * buffer, size_t const num_samples)
     {
         for (size_t i = 0; i < (2 * num_samples); i+=2)
         {
-            short amplitude = 0;
+            int32_t amplitude = 0;
 
             for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
             {
@@ -79,11 +79,22 @@ static void audio_engine_write_buffer(short * buffer, size_t const num_samples)
 
                 component = (short)(((int64_t)component * (int64_t)voice->amp_level) / UINT32_MAX);
 
-                amplitude += (short)(mix_gain * component);
+                amplitude += (int32_t)(mix_gain * component);
 
                 // Increment phase
                 voice->phase += voice->tune;
                 voice_envelope_tick(voice);
+            }
+
+            if (amplitude > INT16_MAX)
+            {
+                gui_warn_clip();
+                amplitude = INT16_MAX;
+            }
+            else if (amplitude < INT16_MIN)
+            {
+                gui_warn_clip();
+                amplitude = INT16_MIN;
             }
 
             // Write stereo samples
@@ -91,4 +102,9 @@ static void audio_engine_write_buffer(short * buffer, size_t const num_samples)
             buffer[i+1] = amplitude;
         }
     }
+}
+
+void audio_engine_set_gain(uint8_t data)
+{
+    mix_gain = (float)data / 127.0f;
 }

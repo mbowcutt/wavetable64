@@ -1,5 +1,6 @@
 #include "input.h"
 
+#include "audio_engine.h"
 #include "voice.h"
 
 #include <libdragon.h>
@@ -7,11 +8,17 @@
 
 #include <stddef.h>
 
+#define MIDI_CC_ATTACK 14
+#define MIDI_CC_DECAY 15
+#define MIDI_CC_SUSTAIN 13
+#define MIDI_CC_RELEASE 12
+#define MIDI_CC_GAIN 117
+
 static size_t midi_in_bytes = 0;
 static uint32_t midi_rx_ctr = 0;
 static uint8_t midi_in_buffer[MIDI_RX_PAYLOAD] = {0};
 
-static void input_handle_midi(size_t midi_in_bytes);
+static bool input_handle_midi(size_t midi_in_bytes);
 
 void input_init(void)
 {
@@ -27,8 +34,7 @@ bool input_poll_and_handle(void)
     if (midi_in_bytes > 0)
     {
         ++midi_rx_ctr;
-        input_handle_midi(midi_in_bytes);
-        return true;
+        return input_handle_midi(midi_in_bytes);
     }
     else
     {
@@ -36,7 +42,7 @@ bool input_poll_and_handle(void)
     }
 }
 
-void input_handle_midi(size_t midi_in_bytes)
+static bool input_handle_midi(size_t midi_in_bytes)
 {
     static midi_parser_state midi_parser = {0};
 
@@ -71,19 +77,23 @@ void input_handle_midi(size_t midi_in_bytes)
         {
             switch (msg.data[0])
             {
-                case 14:
+                case MIDI_CC_ATTACK:
                     voice_envelope_set_attack(msg.data[1]);
                     break;
-                case 15:
+                case MIDI_CC_DECAY:
                     voice_envelope_set_decay(msg.data[1]);
                     break;
-                case 13:
+                case MIDI_CC_SUSTAIN:
                     voice_envelope_set_sustain(msg.data[1]);
                     break;
-                case 12:
+                case MIDI_CC_RELEASE:
                     voice_envelope_set_release(msg.data[1]);
+                    break;
+                case MIDI_CC_GAIN:
+                    audio_engine_set_gain(msg.data[1]);
                     break;
             }
         }
     }
+    return true;
 }

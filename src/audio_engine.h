@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stddef.h>
 
 #ifndef AUDIO_ENGINE_H
@@ -7,6 +8,8 @@
 
 void audio_engine_init(void);
 void audio_engine_run(void);
+
+void audio_engine_set_gain(uint8_t data);
 
 
 #endif

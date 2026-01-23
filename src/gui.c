@@ -8,6 +8,8 @@
 
 // static char * get_osc_type_str(void);
 
+static void gui_print_header(display_context_t disp);
+
 void gui_init(void)
 {
     display_init(RESOLUTION_512x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
@@ -38,9 +40,7 @@ void gui_draw(void)
 #endif
 
     display_context_t disp = display_get();
-	graphics_fill_screen(disp, 0);
-    graphics_draw_text(disp, 30, 10, "N64 Wavetable Synthesizer\t\t\t\t\tv0.1");
-	graphics_draw_text(disp, 30, 18, "(c) 2026 Michael Bowcutt");
+	gui_print_header(disp);
 	// graphics_draw_text(disp, 30, 50, str_osc);
     // graphics_draw_text(disp, 30, 66, str_gain);
     // graphics_draw_text(disp, 30, 74, str_midi_data);
@@ -54,9 +54,7 @@ void gui_draw(void)
 void gui_splash(enum init_state_e init_state)
 {
     display_context_t disp = display_get();
-    graphics_fill_screen(disp, 0);
-    graphics_draw_text(disp, 30, 10, "N64 Wavetable Synthesizer\t\t\t\t\tv0.1");
-    graphics_draw_text(disp, 30, 18, "(c) 2026 Michael Bowcutt");
+    gui_print_header(disp);
 
     if (GEN_SINE == init_state)
     {
@@ -122,6 +120,21 @@ void gui_splash(enum init_state_e init_state)
     }
 
     display_show(disp);
+}
+
+void gui_warn_clip(void)
+{
+    display_context_t disp = display_get();
+    gui_print_header(disp);
+    graphics_draw_text(disp, 30, 40, "CLIP DETECTED!");
+    display_show(disp);
+}
+
+static void gui_print_header(display_context_t disp)
+{
+    graphics_fill_screen(disp, 0);
+    graphics_draw_text(disp, 30, 10, "N64 Wavetable Synthesizer\t\t\t\t\tv0.1");
+	graphics_draw_text(disp, 30, 18, "(c) 2026 Michael Bowcutt");
 }
 
 // static char * get_osc_type_str(void)
