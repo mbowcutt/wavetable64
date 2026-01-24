@@ -21,12 +21,9 @@ int main(void)
     gui_draw();
 
 	while(1) {
-        if (input_poll_and_handle())
-        {
-            gui_draw();
-        }
-
         audio_engine_run();
+        input_poll_and_handle();
+        gui_draw();
     }
 
     // if (mix_buffer) free(mix_buffer);

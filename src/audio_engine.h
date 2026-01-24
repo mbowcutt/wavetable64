@@ -6,6 +6,8 @@
 
 #define SAMPLE_RATE 44100
 
+extern int32_t high_watermark;
+
 void audio_engine_init(void);
 void audio_engine_run(void);
 

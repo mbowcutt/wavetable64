@@ -20,6 +20,8 @@ static size_t mix_buffer_len = 0;
 
 static uint8_t mix_gain_factor = 64;
 
+int32_t high_watermark = 0;
+
 void audio_engine_init(void)
 {
     audio_init(SAMPLE_RATE, NUM_AUDIO_BUFFERS);
@@ -50,6 +52,8 @@ static void audio_engine_write_buffer(short * buffer, size_t const num_samples)
 {
     if (buffer && (num_samples > 0))
     {
+        high_watermark = 0;
+
         for (size_t i = 0; i < (2 * num_samples); i+=2)
         {
             int32_t amplitude = 0;
@@ -75,15 +79,13 @@ static void audio_engine_write_buffer(short * buffer, size_t const num_samples)
 
             amplitude = (amplitude * mix_gain_factor / MIDI_MAX_DATA_BYTE);
 
-            if (amplitude > INT16_MAX)
+            if ((amplitude > 0) && (amplitude > high_watermark))
             {
-                gui_warn_clip();
-                amplitude = INT16_MAX;
+                high_watermark = amplitude;
             }
-            else if (amplitude < INT16_MIN)
+            else if ((amplitude < 0 && ((-1 * amplitude) > high_watermark)))
             {
-                gui_warn_clip();
-                amplitude = INT16_MIN;
+                high_watermark = (-1 * amplitude);
             }
 
             // Write stereo samples

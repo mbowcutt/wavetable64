@@ -1,6 +1,7 @@
 #include "gui.h"
 
 #include "init.h"
+#include "audio_engine.h"
 
 #include <libdragon.h>
 
@@ -21,10 +22,12 @@ static void gui_init_colors(void);
 static void gui_print_header(display_context_t disp);
 static void gui_print_footer(display_context_t disp);
 static void gui_print_menu(display_context_t disp);
+static void gui_print_level_meter(display_context_t disp);
 
 static uint32_t color_red = 0;
 static uint32_t color_green = 0;
 static uint32_t color_blue = 0;
+static uint32_t color_yellow = 0;
 static uint32_t color_white = 0;
 static uint32_t color_black = 0;
 static uint32_t color_gray = 0;
@@ -43,6 +46,7 @@ static void gui_init_colors(void)
     color_red = graphics_make_color(0xFF, 0, 0, 0xFF);
     color_green = graphics_make_color(0, 0xFF, 0, 0xFF);
     color_blue = graphics_make_color(0, 0, 0xFF, 0xFF);
+    color_yellow = graphics_make_color(0xFF, 0xFF, 0, 0xFF);
     color_white = graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF);
     color_black = graphics_make_color(0, 0, 0, 0xFF);
     color_gray = graphics_make_color(0x44, 0x44, 0x44, 0xFF);
@@ -55,6 +59,7 @@ void gui_draw(void)
 	gui_print_header(disp);
     gui_print_footer(disp);
     gui_print_menu(disp);
+    gui_print_level_meter(disp);
 
 	display_show(disp);
 }
@@ -180,6 +185,40 @@ static void gui_print_menu(display_context_t disp)
             break;
     }
     graphics_draw_text(disp, 112, 21, "MAIN\tFILE\tDEBUG\tSETTINGS");
+}
+
+static void gui_print_level_meter(display_context_t disp)
+{
+    size_t const total_boxes = 35;
+    size_t const warn_level = total_boxes * 65 / 100;
+    size_t const clip_level = total_boxes * 9 / 10;
+    size_t const break_level = total_boxes * 11 / 10;
+    size_t num_boxes = (high_watermark * total_boxes) / INT16_MAX;
+
+    int x_pos = 80;
+    uint32_t color = color_green;
+
+    graphics_draw_text(disp, 30, 208, "LEVEL:");
+
+    for (size_t idx = 0; idx < num_boxes; ++idx)
+    {
+        graphics_draw_box(disp, x_pos, 208, 8, 8, color);
+
+        if (warn_level == idx)
+        {
+            color = color_yellow;
+        }
+        else if (clip_level == idx)
+        {
+            color = color_red;
+        }
+        else if (break_level == idx)
+        {
+            break;
+        }
+
+        x_pos += 10;
+    }
 }
 
 void gui_screen_next(void)
