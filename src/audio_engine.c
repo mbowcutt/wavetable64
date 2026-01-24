@@ -16,7 +16,6 @@
 static void audio_engine_write_buffer(short * buffer, size_t const num_samples);
 
 static short * mix_buffer = NULL;
-static bool mix_buffer_full = false;
 static size_t mix_buffer_len = 0;
 
 static uint8_t mix_gain_factor = 64;
@@ -41,22 +40,9 @@ void audio_engine_run(void)
         short * buffer = audio_write_begin();
         if (buffer)
         {
-            if (mix_buffer_full)
-            {
-                memcpy(buffer, mix_buffer, mix_buffer_len);
-                mix_buffer_full = false;
-            }
-            else
-            {
-                audio_engine_write_buffer(buffer, audio_get_buffer_length());
-            }
+            audio_engine_write_buffer(buffer, audio_get_buffer_length());
         }
         audio_write_end();
-    }
-    else if (!mix_buffer_full)
-    {
-        audio_engine_write_buffer(mix_buffer, audio_get_buffer_length());
-        mix_buffer_full = true;
     }
 }
 
