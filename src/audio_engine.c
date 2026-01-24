@@ -15,9 +15,6 @@
 
 static bool audio_engine_write_buffer(short * buffer, size_t const num_samples);
 
-static short * mix_buffer = NULL;
-static size_t mix_buffer_len = 0;
-
 static uint8_t mix_gain_factor = 64;
 
 int32_t high_watermark = 0;
@@ -25,14 +22,7 @@ int32_t high_watermark = 0;
 void audio_engine_init(void)
 {
     audio_init(SAMPLE_RATE, NUM_AUDIO_BUFFERS);
-
     gui_splash(ALLOC_MIX_BUF);
-    mix_buffer_len = 2 * audio_get_buffer_length() * sizeof(short);
-    mix_buffer = malloc(mix_buffer_len);
-    if (!mix_buffer)
-    {
-        //return -1;
-    }
 }
 
 bool audio_engine_run(void)

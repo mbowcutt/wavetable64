@@ -40,7 +40,5 @@ int main(void)
         }
     }
 
-    // if (mix_buffer) free(mix_buffer);
-
 	return 0;
 }
