@@ -45,7 +45,7 @@ static void init_env_sample_lut(float t_min, float t_max)
 {
     for (size_t idx = 0; idx <= MIDI_MAX_DATA_BYTE; ++idx)
     {
-        float seconds = t_min * powf(t_max / t_min, (float)idx / 127.0f);
+        float seconds = t_min * powf(t_max / t_min, (float)idx / (float)MIDI_MAX_DATA_BYTE);
         env_sample_lut[idx] = (uint32_t)(seconds * SAMPLE_RATE);
     }
 }
@@ -173,13 +173,13 @@ void voice_envelope_set_sustain(uint8_t value)
     {
         amp_env.sustain_level = 0;
     }
-    else if (127 == value)
+    else if (MIDI_MAX_DATA_BYTE == value)
     {
         amp_env.sustain_level = UINT32_MAX;
     }
     else
     {
-        amp_env.sustain_level = (uint32_t)(UINT32_MAX * ((float)value / 127.0f));
+        amp_env.sustain_level = (uint32_t)(UINT32_MAX * ((float)value / (float)MIDI_MAX_DATA_BYTE));
     }
 }
 

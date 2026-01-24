@@ -6,6 +6,7 @@
 #include "wavetable.h"
 
 #include <libdragon.h>
+#include <midi.h>
 
 #include <stddef.h>
 #include <stdbool.h>
@@ -18,7 +19,7 @@ static short * mix_buffer = NULL;
 static bool mix_buffer_full = false;
 static size_t mix_buffer_len = 0;
 
-static float mix_gain = 0.5f;
+static uint8_t mix_gain_factor = 64;
 
 void audio_engine_init(void)
 {
@@ -79,12 +80,14 @@ static void audio_engine_write_buffer(short * buffer, size_t const num_samples)
 
                 component = (short)(((int64_t)component * (int64_t)voice->amp_level) / UINT32_MAX);
 
-                amplitude += (int32_t)(mix_gain * component);
+                amplitude += component;
 
                 // Increment phase
                 voice->phase += voice->tune;
                 voice_envelope_tick(voice);
             }
+
+            amplitude = (amplitude * mix_gain_factor / MIDI_MAX_DATA_BYTE);
 
             if (amplitude > INT16_MAX)
             {
@@ -106,5 +109,5 @@ static void audio_engine_write_buffer(short * buffer, size_t const num_samples)
 
 void audio_engine_set_gain(uint8_t data)
 {
-    mix_gain = (float)data / 127.0f;
+    mix_gain_factor = data;
 }
