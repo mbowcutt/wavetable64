@@ -1,6 +1,7 @@
 #include "input.h"
 
 #include "audio_engine.h"
+#include "gui.h"
 #include "voice.h"
 
 #include <libdragon.h>
@@ -27,6 +28,23 @@ void input_init(void)
 
 bool input_poll_and_handle(void)
 {
+    bool update_graphics = false;
+
+    joypad_poll();
+    joypad_buttons_t buttons = joypad_get_buttons_pressed(JOYPAD_PORT_1);
+    if (buttons.raw)
+    {
+        if (buttons.l)
+        {
+            gui_screen_prev();
+        }
+        else if (buttons.r)
+        {
+            gui_screen_next();
+        }
+        update_graphics = true;
+    }
+
     midi_in_bytes = midi_rx_poll(JOYPAD_PORT_1,
                                  midi_in_buffer,
                                  sizeof(midi_in_buffer));
@@ -34,12 +52,10 @@ bool input_poll_and_handle(void)
     if (midi_in_bytes > 0)
     {
         ++midi_rx_ctr;
-        return input_handle_midi(midi_in_bytes);
+        update_graphics = input_handle_midi(midi_in_bytes) || update_graphics;
     }
-    else
-    {
-        return false;
-    }
+
+    return update_graphics;
 }
 
 static bool input_handle_midi(size_t midi_in_bytes)
@@ -95,5 +111,5 @@ static bool input_handle_midi(size_t midi_in_bytes)
             }
         }
     }
-    return true;
+    return false;
 }
