@@ -2,6 +2,7 @@
 
 #include "init.h"
 #include "audio_engine.h"
+#include "voice.h"
 
 #include <libdragon.h>
 
@@ -23,6 +24,7 @@ static void gui_print_header(display_context_t disp);
 static void gui_print_footer(display_context_t disp);
 static void gui_print_menu(display_context_t disp);
 static void gui_print_level_meter(display_context_t disp);
+static void gui_print_main(display_context_t disp);
 
 static uint32_t color_red = 0;
 static uint32_t color_green = 0;
@@ -60,6 +62,21 @@ void gui_draw(void)
     gui_print_footer(disp);
     gui_print_menu(disp);
     gui_print_level_meter(disp);
+
+    switch (current_screen)
+    {
+        case SCREEN_MAIN:
+            gui_print_main(disp);
+            break;
+        case SCREEN_FILE:
+            break;
+        case SCREEN_DEBUG:
+            break;
+        case SCREEN_SETTINGS:
+            break;
+        default:
+            break;
+    }
 
 	display_show(disp);
 }
@@ -198,6 +215,7 @@ static void gui_print_level_meter(display_context_t disp)
     int x_pos = 80;
     uint32_t color = color_green;
 
+    graphics_draw_box(disp, 0, 208, 512, 10, color_black);
     graphics_draw_text(disp, 30, 208, "LEVEL:");
 
     for (size_t idx = 0; idx < num_boxes; ++idx)
@@ -219,6 +237,28 @@ static void gui_print_level_meter(display_context_t disp)
 
         x_pos += 10;
     }
+}
+
+static void gui_print_main(display_context_t disp)
+{
+    // TODO: Oscillator
+    // Envelope ADSR
+    graphics_draw_box(disp, 26, 58, 128, 80, color_gray);
+    graphics_draw_text(disp, 30, 60,  " A   D   S   R ");
+    graphics_draw_text(disp, 30, 130, "      AMP   ");
+
+    int a_height = ((64 * (uint64_t)amp_env.attack_samples) / (uint64_t)env_sample_lut[127]);
+    int a_pos = 122 - a_height;
+    graphics_draw_box(disp, 38, a_pos, 8, a_height, color_white);
+    int d_height = ((64 * (uint64_t)amp_env.decay_samples) / (uint64_t)env_sample_lut[127]);
+    int d_pos = 122 - d_height;
+    graphics_draw_box(disp, 70, d_pos, 8, d_height, color_white);
+    int s_height = ((64 * (uint64_t)amp_env.sustain_level) / (uint64_t)UINT32_MAX);
+    int s_pos = 122 - s_height;
+    graphics_draw_box(disp, 102, s_pos, 8, s_height, color_white);
+    int r_height = ((64 * (uint64_t)amp_env.release_samples) / (uint64_t)env_sample_lut[127]);
+    int r_pos = 122 - r_height;
+    graphics_draw_box(disp, 134, r_pos, 8, r_height, color_white);
 }
 
 void gui_screen_next(void)

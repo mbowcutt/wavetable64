@@ -37,12 +37,13 @@ bool input_poll_and_handle(void)
         if (buttons.l)
         {
             gui_screen_prev();
+            update_graphics = true;
         }
         else if (buttons.r)
         {
             gui_screen_next();
+            update_graphics = true;
         }
-        update_graphics = true;
     }
 
     midi_in_bytes = midi_rx_poll(JOYPAD_PORT_1,
@@ -52,7 +53,10 @@ bool input_poll_and_handle(void)
     if (midi_in_bytes > 0)
     {
         ++midi_rx_ctr;
-        update_graphics = input_handle_midi(midi_in_bytes) || update_graphics;
+        if (input_handle_midi(midi_in_bytes))
+        {
+            update_graphics = true;
+        }
     }
 
     return update_graphics;
@@ -61,6 +65,8 @@ bool input_poll_and_handle(void)
 static bool input_handle_midi(size_t midi_in_bytes)
 {
     static midi_parser_state midi_parser = {0};
+
+    bool update_graphics = false;
 
     midi_msg msg_buf[MIDI_RX_PAYLOAD] = {0};
     size_t num_msgs = midi_process_messages(&midi_parser, 
@@ -95,21 +101,27 @@ static bool input_handle_midi(size_t midi_in_bytes)
             {
                 case MIDI_CC_ATTACK:
                     voice_envelope_set_attack(msg.data[1]);
+                    update_graphics = true;
                     break;
                 case MIDI_CC_DECAY:
                     voice_envelope_set_decay(msg.data[1]);
+                    update_graphics = true;
                     break;
                 case MIDI_CC_SUSTAIN:
                     voice_envelope_set_sustain(msg.data[1]);
+                    update_graphics = true;
                     break;
                 case MIDI_CC_RELEASE:
                     voice_envelope_set_release(msg.data[1]);
+                    update_graphics = true;
                     break;
                 case MIDI_CC_GAIN:
                     audio_engine_set_gain(msg.data[1]);
+                    update_graphics = true;
                     break;
             }
         }
     }
-    return false;
+
+    return update_graphics;
 }

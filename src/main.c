@@ -20,10 +20,24 @@ int main(void)
 
     gui_draw();
 
+    bool update_graphics = false;
+
 	while(1) {
-        audio_engine_run();
-        input_poll_and_handle();
-        gui_draw();
+        if (audio_engine_run())
+        {
+            update_graphics = true;
+        }
+
+        if (input_poll_and_handle())
+        {
+            update_graphics = true;
+        }
+
+        if (update_graphics)
+        {
+            gui_draw();
+            update_graphics = false;
+        }
     }
 
     // if (mix_buffer) free(mix_buffer);

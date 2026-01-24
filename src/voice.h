@@ -3,6 +3,8 @@
 
 #include "wavetable.h"
 
+#include <midi.h>
+
 #ifndef VOICE_H
 #define VOICE_H
 
@@ -37,6 +39,9 @@ typedef struct
     uint32_t amp_env_rate;
     uint64_t timestamp;
 } voice_t;
+
+extern struct envelope_s amp_env;
+extern uint32_t env_sample_lut[MIDI_MAX_DATA_BYTE + 1];
 
 void voice_init(void);
 

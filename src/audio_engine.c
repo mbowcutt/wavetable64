@@ -13,7 +13,7 @@
 
 #define NUM_AUDIO_BUFFERS 4
 
-static void audio_engine_write_buffer(short * buffer, size_t const num_samples);
+static bool audio_engine_write_buffer(short * buffer, size_t const num_samples);
 
 static short * mix_buffer = NULL;
 static size_t mix_buffer_len = 0;
@@ -35,25 +35,27 @@ void audio_engine_init(void)
     }
 }
 
-void audio_engine_run(void)
+bool audio_engine_run(void)
 {
+    bool update_graphics = false;
     if (audio_can_write())
     {
         short * buffer = audio_write_begin();
         if (buffer)
         {
-            audio_engine_write_buffer(buffer, audio_get_buffer_length());
+            update_graphics = audio_engine_write_buffer(buffer, audio_get_buffer_length());
         }
         audio_write_end();
     }
+    return update_graphics;
 }
 
-static void audio_engine_write_buffer(short * buffer, size_t const num_samples)
+static bool audio_engine_write_buffer(short * buffer, size_t const num_samples)
 {
+    high_watermark = 0;
+
     if (buffer && (num_samples > 0))
     {
-        high_watermark = 0;
-
         for (size_t i = 0; i < (2 * num_samples); i+=2)
         {
             int32_t amplitude = 0;
@@ -93,6 +95,8 @@ static void audio_engine_write_buffer(short * buffer, size_t const num_samples)
             buffer[i+1] = amplitude;
         }
     }
+
+    return (0 != high_watermark);
 }
 
 void audio_engine_set_gain(uint8_t data)

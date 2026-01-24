@@ -12,9 +12,9 @@
 
 static voice_t voices[POLYPHONY_COUNT];
 
-static struct envelope_s amp_env;
+struct envelope_s amp_env;
 
-static uint32_t env_sample_lut[MIDI_MAX_DATA_BYTE + 1] = {0};
+uint32_t env_sample_lut[MIDI_MAX_DATA_BYTE + 1] = {0};
 
 static void init_env_sample_lut(float t_min, float t_max);
 

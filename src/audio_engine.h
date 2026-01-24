@@ -1,5 +1,6 @@
-#include <stdint.h>
+#include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifndef AUDIO_ENGINE_H
 #define AUDIO_ENGINE_H
@@ -9,7 +10,7 @@
 extern int32_t high_watermark;
 
 void audio_engine_init(void);
-void audio_engine_run(void);
+bool audio_engine_run(void);
 
 void audio_engine_set_gain(uint8_t data);
 
