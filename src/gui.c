@@ -3,13 +3,12 @@
 #include "init.h"
 #include "audio_engine.h"
 #include "voice.h"
+#include "wavetable.h"
 
 #include <libdragon.h>
 #include <midi.h>
 
 #include <stddef.h>
-
-// static char * get_osc_type_str(void);
 
 enum menu_screen
 {
@@ -26,6 +25,9 @@ static void gui_print_footer(display_context_t disp);
 static void gui_print_menu(display_context_t disp);
 static void gui_print_level_meter(display_context_t disp);
 static void gui_print_main(display_context_t disp);
+
+static char * get_osc_type_str(enum oscillator_type_e osc_type);
+
 
 static uint32_t color_red = 0;
 static uint32_t color_green = 0;
@@ -242,7 +244,12 @@ static void gui_print_level_meter(display_context_t disp)
 
 static void gui_print_main(display_context_t disp)
 {
-    // TODO: Oscillator
+    // Oscillator
+    char osc_str[64] = {0};
+    snprintf(osc_str, sizeof(osc_str), "OSC: %s", get_osc_type_str(cur_osc));
+    graphics_draw_box(disp, 26, 34, 128, 10, color_gray);
+    graphics_draw_text(disp, 34, 36, osc_str);
+
     // Envelope ADSR
     int const x_base = 26;
     int const y_base = 46;
@@ -293,20 +300,20 @@ void gui_screen_prev(void)
     }
 }
 
-// static char * get_osc_type_str(void)
-// {
-//     switch (osc_type)
-//     {
-//         case SINE:
-//             return "Sine";
-//         case TRIANGLE:
-//             return "Triangle";
-//         case SQUARE:
-//             return "Square";
-//         case RAMP:
-//             return "Ramp";
-//         case NUM_OSCILLATORS:
-//         default:
-//             return "Unknown";
-//     }
-// }
+static char * get_osc_type_str(enum oscillator_type_e osc_type)
+{
+    switch (osc_type)
+    {
+        case SINE:
+            return "SINE";
+        case TRIANGLE:
+            return "TRIANGLE";
+        case SQUARE:
+            return "SQUARE";
+        case RAMP:
+            return "RAMP";
+        case NUM_OSCILLATORS:
+        default:
+            return "Unknown";
+    }
+}

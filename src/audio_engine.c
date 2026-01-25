@@ -58,7 +58,7 @@ static bool audio_engine_write_buffer(short * buffer, size_t const num_samples)
                     continue;
 
                 short component = wavetable_get_amplitude(voice->phase,
-                                                          voice->osc_ptr);
+                                                          wavetable_get(cur_osc));
 
                 component = (short)(((int64_t)component * (int64_t)voice->amp_level) / UINT32_MAX);
 

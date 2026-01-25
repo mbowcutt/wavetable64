@@ -54,6 +54,8 @@ static short * osc_wave_tables[NUM_OSCILLATORS] =
     ramp_tbl
 };
 
+enum oscillator_type_e cur_osc = SINE;
+
 
 void wavetable_init(void)
 {

@@ -13,6 +13,8 @@ enum oscillator_type_e {
     NUM_OSCILLATORS
 };
 
+extern enum oscillator_type_e cur_osc;
+
 void wavetable_init(void);
 short * wavetable_get(enum oscillator_type_e osc);
 uint32_t wavetable_get_tune(uint8_t const note);
