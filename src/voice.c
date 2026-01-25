@@ -20,10 +20,10 @@ static void init_env_sample_lut(float t_min, float t_max);
 
 void voice_init(void)
 {
-    amp_env.attack_samples = SAMPLE_RATE;  // 1 second attack
-    amp_env.decay_samples = SAMPLE_RATE;   // 1 second decay
-    amp_env.sustain_level = 0x7FFFFFFFu; // 50% sustain level
-    amp_env.release_samples = SAMPLE_RATE;  // 1 second release
+    amp_env.attack = 1;
+    amp_env.decay = 5;
+    amp_env.sustain_level = UINT32_MAX / 2;
+    amp_env.release = 127;
 
     for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
     {
@@ -112,7 +112,7 @@ void voice_envelope_tick(voice_t * voice)
                 {
                     voice->amp_level = UINT32_MAX;
                     voice->amp_env_state = DECAY;
-                    voice->amp_env_rate = (UINT32_MAX - amp_env.sustain_level) / amp_env.decay_samples;
+                    voice->amp_env_rate = (UINT32_MAX - amp_env.sustain_level) / env_sample_lut[amp_env.decay];
                 }
                 else
                 {
@@ -159,33 +159,22 @@ void voice_envelope_tick(voice_t * voice)
 
 void voice_envelope_set_attack(uint8_t value)
 {
-    amp_env.attack_samples = env_sample_lut[value];
+    amp_env.attack = value;
 }
 
 void voice_envelope_set_decay(uint8_t value)
 {
-    amp_env.decay_samples = env_sample_lut[value];
+    amp_env.decay = value;
 }
 
 void voice_envelope_set_sustain(uint8_t value)
 {
-    if (0 == value)
-    {
-        amp_env.sustain_level = 0;
-    }
-    else if (MIDI_MAX_DATA_BYTE == value)
-    {
-        amp_env.sustain_level = UINT32_MAX;
-    }
-    else
-    {
-        amp_env.sustain_level = (uint32_t)(UINT32_MAX * ((float)value / (float)MIDI_MAX_DATA_BYTE));
-    }
+    amp_env.sustain_level = ((uint64_t)value * UINT32_MAX) / MIDI_MAX_DATA_BYTE;
 }
 
 void voice_envelope_set_release(uint8_t value)
 {
-    amp_env.release_samples = env_sample_lut[value];
+    amp_env.release = value;
 }
 
 void voice_note_on(voice_t * voice, uint8_t note)
@@ -193,7 +182,7 @@ void voice_note_on(voice_t * voice, uint8_t note)
     voice->note = note;
     voice->tune = wavetable_get_tune(note);
     voice->amp_env_state = ATTACK;
-    voice->amp_env_rate = (UINT32_MAX - voice->amp_level) / amp_env.attack_samples;
+    voice->amp_env_rate = (UINT32_MAX - voice->amp_level) / env_sample_lut[amp_env.attack];
     voice->timestamp = get_ticks();
 }
 
@@ -202,7 +191,6 @@ void voice_note_off(voice_t * voice)
     if (IDLE != voice->amp_env_state)
     {
         voice->amp_env_state = RELEASE;
-        voice->amp_env_rate = (voice->amp_level - 0) / amp_env.release_samples;
+        voice->amp_env_rate = (voice->amp_level - 0) / env_sample_lut[amp_env.release];
     }
 }
-

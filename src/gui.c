@@ -5,6 +5,7 @@
 #include "voice.h"
 
 #include <libdragon.h>
+#include <midi.h>
 
 #include <stddef.h>
 
@@ -243,22 +244,29 @@ static void gui_print_main(display_context_t disp)
 {
     // TODO: Oscillator
     // Envelope ADSR
-    graphics_draw_box(disp, 26, 58, 128, 80, color_gray);
-    graphics_draw_text(disp, 30, 60,  " A   D   S   R ");
-    graphics_draw_text(disp, 30, 130, "      AMP   ");
+    int const x_base = 26;
+    int const y_base = 46;
+    int const box_width = 128;
+    int const box_height = 140;
+    graphics_draw_box(disp, x_base, y_base, box_width, box_height, color_gray);
+    graphics_draw_text(disp, x_base + 4, y_base + box_height - 8,  " A   D   S   R ");
+    graphics_draw_text(disp, x_base + 4, y_base + box_height + 2,  "      AMP   ");
 
-    int a_height = ((64 * (uint64_t)amp_env.attack_samples) / (uint64_t)env_sample_lut[127]);
-    int a_pos = 122 - a_height;
-    graphics_draw_box(disp, 38, a_pos, 8, a_height, color_white);
-    int d_height = ((64 * (uint64_t)amp_env.decay_samples) / (uint64_t)env_sample_lut[127]);
-    int d_pos = 122 - d_height;
-    graphics_draw_box(disp, 70, d_pos, 8, d_height, color_white);
-    int s_height = ((64 * (uint64_t)amp_env.sustain_level) / (uint64_t)UINT32_MAX);
-    int s_pos = 122 - s_height;
-    graphics_draw_box(disp, 102, s_pos, 8, s_height, color_white);
-    int r_height = ((64 * (uint64_t)amp_env.release_samples) / (uint64_t)env_sample_lut[127]);
-    int r_pos = 122 - r_height;
-    graphics_draw_box(disp, 134, r_pos, 8, r_height, color_white);
+    int a_height = amp_env.attack;
+    int a_pos = y_base + (box_height - 10) - a_height;
+    graphics_draw_box(disp, x_base + 12, a_pos, 8, a_height, color_white);
+
+    int d_height = amp_env.decay;
+    int d_pos = y_base + (box_height - 10) - d_height;
+    graphics_draw_box(disp, x_base + 44, d_pos, 8, d_height, color_white);
+
+    int s_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)amp_env.sustain_level) / (uint64_t)UINT32_MAX);
+    int s_pos = y_base + (box_height - 10) - s_height;
+    graphics_draw_box(disp, x_base + 76, s_pos, 8, s_height, color_white);
+
+    int r_height = amp_env.release;
+    int r_pos = y_base + (box_height - 10) - r_height;
+    graphics_draw_box(disp, x_base + 108, r_pos, 8, r_height, color_white);
 }
 
 void gui_screen_next(void)

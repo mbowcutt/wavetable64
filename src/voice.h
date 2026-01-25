@@ -22,10 +22,10 @@ enum envelope_state_e {
 
 struct envelope_s
 {
-    uint32_t attack_samples;
-    uint32_t decay_samples;
+    uint8_t attack;
+    uint8_t decay;
     uint32_t sustain_level;
-    uint32_t release_samples;
+    uint8_t release;
 };
 
 typedef struct
