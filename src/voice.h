@@ -1,45 +1,27 @@
+#ifndef VOICE_H
+#define VOICE_H
+
 #include <stddef.h>
 #include <stdint.h>
 
+#include "envelope.h"
 #include "wavetable.h"
 
 #include <midi.h>
 
-#ifndef VOICE_H
-#define VOICE_H
-
 #define POLYPHONY_COUNT 8
-
-
-enum envelope_state_e {
-    IDLE,
-    ATTACK,
-    DECAY,
-    SUSTAIN,
-    RELEASE,
-    NUM_ENVELOPE_STATES
-};
-
-struct envelope_s
-{
-    uint8_t attack;
-    uint8_t decay;
-    uint32_t sustain_level;
-    uint8_t release;
-};
 
 typedef struct
 {
     uint8_t note;
     uint32_t phase;
     uint32_t tune;
-    enum envelope_state_e amp_env_state;
-    uint32_t amp_level;
-    uint32_t amp_env_rate;
+    enum envelope_state_e amp_env_state[NUM_WAVETABLES];
+    uint32_t amp_level[NUM_WAVETABLES];
+    uint32_t amp_env_rate[NUM_WAVETABLES];
     uint64_t timestamp;
 } voice_t;
 
-extern struct envelope_s amp_env;
 extern uint32_t env_sample_lut[MIDI_MAX_DATA_BYTE + 1];
 
 void voice_init(void);

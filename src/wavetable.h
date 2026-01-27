@@ -1,9 +1,11 @@
+#ifndef WAVETABLE_H
+#define WAVETABLE_H
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#ifndef WAVETABLE_H
-#define WAVETABLE_H
+#include "envelope.h"
 
 #define NUM_WAVETABLES 5
 
@@ -17,7 +19,13 @@ enum oscillator_type_e {
     NONE = NUM_OSCILLATORS
 };
 
-extern enum oscillator_type_e osc[NUM_WAVETABLES];
+typedef struct {
+    enum oscillator_type_e osc;
+    struct envelope_s amp_env;
+    uint8_t amt;
+} wavetable_t;
+
+extern wavetable_t waveforms[NUM_WAVETABLES];
 
 void wavetable_init(void);
 short * wavetable_get(enum oscillator_type_e osc);

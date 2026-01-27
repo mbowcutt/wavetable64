@@ -134,19 +134,19 @@ static bool input_handle_midi(size_t midi_in_bytes)
                             switch (msg.data[1])
                             {
                                 case 0:
-                                    osc[0] = TRIANGLE;
+                                    waveforms[0].osc = TRIANGLE;
                                     update_graphics = true;
                                     break;
                                 case 1:
-                                    osc[0] = SINE;
+                                    waveforms[0].osc = SINE;
                                     update_graphics = true;
                                     break;
                                 case 2:
-                                    osc[0] = RAMP;
+                                    waveforms[0].osc = RAMP;
                                     update_graphics = true;
                                     break;
                                 case 3:
-                                    osc[0] = SQUARE;
+                                    waveforms[0].osc = SQUARE;
                                     update_graphics = true;
                                     break;
                                 default:

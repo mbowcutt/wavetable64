@@ -54,15 +54,23 @@ static bool audio_engine_write_buffer(short * buffer, size_t const num_samples)
             {
                 voice_t * voice = voice_get(voice_idx);
 
-                if (IDLE == voice->amp_env_state)
-                    continue;
+                for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+                {
+                    wavetable_t wav = waveforms[wav_idx];
 
-                short component = wavetable_get_amplitude(voice->phase,
-                                                          wavetable_get(osc[0]));
+                    if (NONE != wav.osc)
+                    {
+                        if (IDLE == voice->amp_env_state[wav_idx])
+                            continue;
+                        short component = wavetable_get_amplitude(voice->phase,
+                                                                  wavetable_get(wav.osc));
 
-                component = (short)(((int64_t)component * (int64_t)voice->amp_level) / UINT32_MAX);
+                        component = (short)(((int64_t)component * (int64_t)voice->amp_level[wav_idx]) / UINT32_MAX);
+                        component = (component * wav.amt) / MIDI_MAX_DATA_BYTE;
 
-                amplitude += component;
+                        amplitude += component;
+                    }
+                }
 
                 // Increment phase
                 voice->phase += voice->tune;

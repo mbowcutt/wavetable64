@@ -28,8 +28,7 @@ static void gui_print_main(display_context_t disp);
 
 static void gui_draw_osc_type_and_amp_env(display_context_t disp,
                                           int x_base, int y_base,
-                                          uint8_t osc_idx,
-                                          struct envelope_s env);
+                                          uint8_t wav_idx);
 
 static char * get_osc_type_str(enum oscillator_type_e osc_type);
 
@@ -265,10 +264,10 @@ static void gui_print_main(display_context_t disp)
 
     x_base += (5 * 8);
 
-    for (uint8_t osc_idx = 0; osc_idx < NUM_WAVETABLES; ++osc_idx)
+    for (uint8_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
     {
         gui_draw_osc_type_and_amp_env(disp, x_base, y_base,
-                                      osc_idx, amp_env);
+                                      wav_idx);
         x_base += (80 + 4);
     }
 }
@@ -299,10 +298,10 @@ void gui_screen_prev(void)
 
 static void gui_draw_osc_type_and_amp_env(display_context_t disp,
                                           int x_base, int y_base,
-                                          uint8_t osc_idx,
-                                          struct envelope_s env)
+                                          uint8_t wav_idx)
 {
-    enum oscillator_type_e const osc_type = osc[osc_idx];
+    enum oscillator_type_e const osc_type = waveforms[wav_idx].osc;
+    struct envelope_s env = waveforms[wav_idx].amp_env;
     int const box_width = 80;
     int const env_box_height = 140;
 

@@ -54,16 +54,26 @@ static short * osc_wave_tables[NUM_OSCILLATORS] =
     ramp_tbl
 };
 
-enum oscillator_type_e osc[NUM_WAVETABLES] =
-{
-    SINE, NONE, NONE, NONE, NONE
-};
+wavetable_t waveforms[NUM_WAVETABLES];
 
 
 void wavetable_init(void)
 {
     wavetable_generate_all();
     wavetable_generate_midi_freq_tbl();
+
+    for (uint8_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+    {
+        wavetable_t * wav = &waveforms[wav_idx];
+        wav->osc = NONE;
+        wav->amp_env.attack = 0;
+        wav->amp_env.decay = 0;
+        wav->amp_env.sustain_level = UINT32_MAX / 2;
+        wav->amp_env.release = 0;
+        wav->amt = 0;
+    }
+    waveforms[0].osc = SINE;
+    waveforms[0].amt = 127;
 }
 
 short * wavetable_get(enum oscillator_type_e osc)
