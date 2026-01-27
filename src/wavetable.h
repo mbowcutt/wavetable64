@@ -5,15 +5,19 @@
 #ifndef WAVETABLE_H
 #define WAVETABLE_H
 
+#define NUM_WAVETABLES 5
+
 enum oscillator_type_e {
     SINE,
     TRIANGLE,
     SQUARE,
     RAMP,
-    NUM_OSCILLATORS
+    NUM_OSCILLATORS,
+
+    NONE = NUM_OSCILLATORS
 };
 
-extern enum oscillator_type_e cur_osc;
+extern enum oscillator_type_e osc[NUM_WAVETABLES];
 
 void wavetable_init(void);
 short * wavetable_get(enum oscillator_type_e osc);

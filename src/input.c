@@ -3,6 +3,7 @@
 #include "audio_engine.h"
 #include "gui.h"
 #include "voice.h"
+#include "wavetable.h"
 
 #include <libdragon.h>
 #include <midi.h>
@@ -20,6 +21,7 @@ static uint32_t midi_rx_ctr = 0;
 static uint8_t midi_in_buffer[MIDI_RX_PAYLOAD] = {0};
 
 static bool input_handle_midi(size_t midi_in_bytes);
+static uint16_t nrpn = 0;
 
 void input_init(void)
 {
@@ -118,6 +120,42 @@ static bool input_handle_midi(size_t midi_in_bytes)
                 case MIDI_CC_GAIN:
                     audio_engine_set_gain(msg.data[1]);
                     update_graphics = true;
+                    break;
+                case 99:
+                    nrpn = ((uint16_t)msg.data[1]) << 7;
+                    break;
+                case 98:
+                    nrpn |= msg.data[1];
+                    break;
+                case 6:
+                    switch (nrpn)
+                    {
+                        case 0x0003:
+                            switch (msg.data[1])
+                            {
+                                case 0:
+                                    osc[0] = TRIANGLE;
+                                    update_graphics = true;
+                                    break;
+                                case 1:
+                                    osc[0] = SINE;
+                                    update_graphics = true;
+                                    break;
+                                case 2:
+                                    osc[0] = RAMP;
+                                    update_graphics = true;
+                                    break;
+                                case 3:
+                                    osc[0] = SQUARE;
+                                    update_graphics = true;
+                                    break;
+                                default:
+                                    break;
+                            }
+                            break;
+                        default:
+                            break;
+                    }
                     break;
             }
         }

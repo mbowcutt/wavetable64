@@ -26,6 +26,11 @@ static void gui_print_menu(display_context_t disp);
 static void gui_print_level_meter(display_context_t disp);
 static void gui_print_main(display_context_t disp);
 
+static void gui_draw_osc_type_and_amp_env(display_context_t disp,
+                                          int x_base, int y_base,
+                                          uint8_t osc_idx,
+                                          struct envelope_s env);
+
 static char * get_osc_type_str(enum oscillator_type_e osc_type);
 
 
@@ -244,36 +249,28 @@ static void gui_print_level_meter(display_context_t disp)
 
 static void gui_print_main(display_context_t disp)
 {
-    // Oscillator
-    char osc_str[64] = {0};
-    snprintf(osc_str, sizeof(osc_str), "OSC: %s", get_osc_type_str(cur_osc));
-    graphics_draw_box(disp, 26, 34, 128, 10, color_gray);
-    graphics_draw_text(disp, 34, 36, osc_str);
+    int x_base = 26;
+    int y_base = 34;
 
-    // Envelope ADSR
-    int const x_base = 26;
-    int const y_base = 46;
-    int const box_width = 128;
-    int const box_height = 140;
-    graphics_draw_box(disp, x_base, y_base, box_width, box_height, color_gray);
-    graphics_draw_text(disp, x_base + 4, y_base + box_height - 8,  " A   D   S   R ");
-    graphics_draw_text(disp, x_base + 4, y_base + box_height + 2,  "      AMP   ");
+    graphics_draw_text(disp, x_base, y_base + 2, "OSC:");
+    graphics_draw_text(disp, x_base, y_base + 140 + 12 + 3, "AMT:");
 
-    int a_height = amp_env.attack;
-    int a_pos = y_base + (box_height - 10) - a_height;
-    graphics_draw_box(disp, x_base + 12, a_pos, 8, a_height, color_white);
+    graphics_draw_character(disp, x_base + 16, y_base + 56, 'A');
+    graphics_draw_character(disp, x_base + 16, y_base + 64, 'M');
+    graphics_draw_character(disp, x_base + 16, y_base + 72, 'P');
 
-    int d_height = amp_env.decay;
-    int d_pos = y_base + (box_height - 10) - d_height;
-    graphics_draw_box(disp, x_base + 44, d_pos, 8, d_height, color_white);
+    graphics_draw_character(disp, x_base + 16, y_base + 88, 'E');
+    graphics_draw_character(disp, x_base + 16, y_base + 96, 'N');
+    graphics_draw_character(disp, x_base + 16, y_base + 104, 'V');
 
-    int s_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)amp_env.sustain_level) / (uint64_t)UINT32_MAX);
-    int s_pos = y_base + (box_height - 10) - s_height;
-    graphics_draw_box(disp, x_base + 76, s_pos, 8, s_height, color_white);
+    x_base += (5 * 8);
 
-    int r_height = amp_env.release;
-    int r_pos = y_base + (box_height - 10) - r_height;
-    graphics_draw_box(disp, x_base + 108, r_pos, 8, r_height, color_white);
+    for (uint8_t osc_idx = 0; osc_idx < NUM_WAVETABLES; ++osc_idx)
+    {
+        gui_draw_osc_type_and_amp_env(disp, x_base, y_base,
+                                      osc_idx, amp_env);
+        x_base += (80 + 4);
+    }
 }
 
 void gui_screen_next(void)
@@ -300,6 +297,48 @@ void gui_screen_prev(void)
     }
 }
 
+static void gui_draw_osc_type_and_amp_env(display_context_t disp,
+                                          int x_base, int y_base,
+                                          uint8_t osc_idx,
+                                          struct envelope_s env)
+{
+    enum oscillator_type_e const osc_type = osc[osc_idx];
+    int const box_width = 80;
+    int const env_box_height = 140;
+
+    char osc_str[64] = {0};
+    snprintf(osc_str, sizeof(osc_str), "%s", get_osc_type_str(osc_type));
+    graphics_draw_box(disp, x_base, y_base, box_width, 10, color_gray);
+    graphics_draw_text(disp, x_base + 4, y_base + 2, osc_str);
+
+    y_base += 12;
+
+    graphics_draw_box(disp, x_base, y_base, box_width, env_box_height, color_gray);
+    graphics_draw_box(disp, x_base, y_base + env_box_height + 2, box_width, 10, color_gray);
+    x_base += 4;
+    graphics_draw_text(disp, x_base, y_base + env_box_height - 8,  " A D S R ");
+    x_base += 8;
+
+    int a_height = env.attack;
+    int a_pos = y_base + (env_box_height - 10) - a_height;
+    graphics_draw_box(disp, x_base, a_pos, 8, a_height, color_white);
+    x_base += (2 * 8);
+
+    int d_height = env.decay;
+    int d_pos = y_base + (env_box_height - 10) - d_height;
+    graphics_draw_box(disp, x_base, d_pos, 8, d_height, color_white);
+    x_base += (2 * 8);
+
+    int s_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env.sustain_level) / (uint64_t)UINT32_MAX);
+    int s_pos = y_base + (env_box_height - 10) - s_height;
+    graphics_draw_box(disp, x_base, s_pos, 8, s_height, color_white);
+    x_base += (2 * 8);
+
+    int r_height = env.release;
+    int r_pos = y_base + (env_box_height - 10) - r_height;
+    graphics_draw_box(disp, x_base, r_pos, 8, r_height, color_white);
+}
+
 static char * get_osc_type_str(enum oscillator_type_e osc_type)
 {
     switch (osc_type)
@@ -312,7 +351,8 @@ static char * get_osc_type_str(enum oscillator_type_e osc_type)
             return "SQUARE";
         case RAMP:
             return "RAMP";
-        case NUM_OSCILLATORS:
+        case NONE:
+            return "NONE";
         default:
             return "Unknown";
     }
