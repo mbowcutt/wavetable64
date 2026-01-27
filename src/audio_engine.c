@@ -13,7 +13,7 @@
 
 #define NUM_AUDIO_BUFFERS 4
 
-static bool audio_engine_write_buffer(short * buffer, size_t const num_samples);
+static void audio_engine_write_buffer(short * buffer, size_t num_samples);
 
 static uint8_t mix_gain_factor = 64;
 
@@ -23,24 +23,14 @@ void audio_engine_init(void)
 {
     audio_init(SAMPLE_RATE, NUM_AUDIO_BUFFERS);
     gui_splash(ALLOC_MIX_BUF);
+
+    audio_set_buffer_callback(audio_engine_write_buffer);
+
+    // Must kick-start audio callback with dummy write
+    audio_write_silence();
 }
 
-bool audio_engine_run(void)
-{
-    bool update_graphics = false;
-    if (audio_can_write())
-    {
-        short * buffer = audio_write_begin();
-        if (buffer)
-        {
-            update_graphics = audio_engine_write_buffer(buffer, audio_get_buffer_length());
-        }
-        audio_write_end();
-    }
-    return update_graphics;
-}
-
-static bool audio_engine_write_buffer(short * buffer, size_t const num_samples)
+static void audio_engine_write_buffer(short * buffer, size_t num_samples)
 {
     high_watermark = 0;
 
@@ -93,8 +83,6 @@ static bool audio_engine_write_buffer(short * buffer, size_t const num_samples)
             buffer[i+1] = amplitude;
         }
     }
-
-    return (0 != high_watermark);
 }
 
 void audio_engine_set_gain(uint8_t data)

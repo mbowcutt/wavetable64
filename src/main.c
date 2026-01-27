@@ -23,17 +23,12 @@ int main(void)
     bool update_graphics = false;
 
 	while(1) {
-        if (audio_engine_run())
-        {
-            update_graphics = true;
-        }
-
         if (input_poll_and_handle())
         {
             update_graphics = true;
         }
 
-        if (update_graphics)
+        if (update_graphics || (0u != high_watermark))
         {
             gui_draw();
             update_graphics = false;
