@@ -7,6 +7,9 @@
 
 #include <libdragon.h>
 #include <midi.h>
+#include <rdpq.h>
+#include <rdpq_rect.h>
+#include <rdpq_text.h>
 
 #include <stddef.h>
 
@@ -46,6 +49,9 @@ static enum menu_screen current_screen = SCREEN_MAIN;
 void gui_init(void)
 {
     display_init(RESOLUTION_512x240, DEPTH_16_BPP, 3, GAMMA_NONE, FILTERS_RESAMPLE);
+    rdpq_init();
+    rdpq_font_t *font = rdpq_font_load_builtin(FONT_BUILTIN_DEBUG_MONO);
+    rdpq_text_register_font(1, font);
     gui_init_colors();
     gui_splash(INIT);
 }
@@ -68,7 +74,7 @@ void gui_draw(void)
 	gui_print_header(disp);
     gui_print_footer(disp);
     gui_print_menu(disp);
-    gui_print_level_meter(disp);
+    // gui_print_level_meter(disp);
 
     switch (current_screen)
     {
@@ -244,6 +250,51 @@ static void gui_print_level_meter(display_context_t disp)
 
         x_pos += 10;
     }
+}
+
+void gui_draw_level_meter(void)
+{
+    surface_t * disp = display_get();
+    rdpq_attach(disp, NULL);
+
+    rdpq_set_mode_fill(RGBA32(0, 0, 0, 0xFF));
+    rdpq_fill_rectangle(0, 208, 512, 218);
+
+    rdpq_text_print(NULL, 1, 30, 216, "LEVEL:");
+
+    size_t const total_boxes = 35;
+    size_t const warn_level = total_boxes * 65 / 100;
+    size_t const clip_level = total_boxes * 9 / 10;
+    size_t const break_level = total_boxes * 11 / 10;
+
+    size_t num_boxes = (high_watermark * total_boxes) / INT16_MAX;
+
+    int x_pos = 80;
+    rdpq_set_mode_fill(RGBA32(0, 0xFF, 0, 0xFF)); // Set color = green
+
+    for (size_t idx = 0; idx < num_boxes; ++idx)
+    {
+        rdpq_fill_rectangle(x_pos, 208, x_pos + 8, 216);
+
+        if (warn_level == idx)
+        {
+            // Set color = yellow
+            rdpq_set_mode_fill(RGBA32(0xFF, 0xFF, 0, 0xFF));
+        }
+        else if (clip_level == idx)
+        {
+            // Set color = red
+            rdpq_set_mode_fill(RGBA32(0xFF, 0, 0, 0xFF));
+        }
+        else if (break_level == idx)
+        {
+            break;
+        }
+
+        x_pos += 10;
+    }
+
+    rdpq_detach_show();
 }
 
 static void gui_print_main(display_context_t disp)

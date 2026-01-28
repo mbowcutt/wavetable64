@@ -28,7 +28,12 @@ int main(void)
             update_graphics = true;
         }
 
-        if (update_graphics || (0u != high_watermark))
+        if (0u != high_watermark)
+        {
+            gui_draw_level_meter();
+        }
+
+        if (update_graphics)
         {
             gui_draw();
             update_graphics = false;
