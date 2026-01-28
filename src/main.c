@@ -18,7 +18,7 @@ int main(void)
     // debug_init_isviewer();
     // debug_init_usblog();
 
-    gui_draw();
+    gui_draw_screen();
 
     bool update_graphics = false;
 
@@ -30,12 +30,12 @@ int main(void)
 
         if (0u != high_watermark)
         {
-            gui_draw_level_meter();
+            gui_draw_level_meter(NULL);
         }
 
         if (update_graphics)
         {
-            gui_draw();
+            gui_draw_screen();
             update_graphics = false;
         }
     }
