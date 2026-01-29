@@ -307,6 +307,9 @@ void gui_screen_prev(void)
     }
 }
 
+static uint8_t selected_wav_idx = 0;
+static uint8_t selected_field_main = 0;
+
 static void gui_draw_osc_type_and_amp_env(display_context_t disp,
                                           int x_base, int y_base,
                                           uint8_t wav_idx)
@@ -316,16 +319,28 @@ static void gui_draw_osc_type_and_amp_env(display_context_t disp,
     int const box_width = 80;
     int const env_box_height = 140;
 
-    rdpq_set_mode_fill(color_gray);
+    if ((0 == selected_field_main) && (wav_idx == selected_wav_idx))
+        rdpq_set_mode_fill(color_blue);
+    else
+        rdpq_set_mode_fill(color_gray);
     rdpq_fill_rectangle(x_base, y_base, x_base + box_width, y_base + 10);
     rdpq_text_printf(NULL, 1, x_base + 4, y_base + 9, "%s", get_osc_type_str(osc_type));
 
     y_base += 12;
 
-    rdpq_set_mode_fill(color_gray);
+    if ((1 == selected_field_main) && (wav_idx == selected_wav_idx))
+        rdpq_set_mode_fill(color_blue);
+    else
+        rdpq_set_mode_fill(color_gray);
     rdpq_fill_rectangle(x_base, y_base, x_base + box_width, y_base + env_box_height);
+
+    if ((2 == selected_field_main) && (wav_idx == selected_wav_idx))
+        rdpq_set_mode_fill(color_blue);
+    else
+        rdpq_set_mode_fill(color_gray);
     rdpq_fill_rectangle(x_base, y_base + env_box_height + 2, x_base + box_width, y_base + env_box_height + 12);
     x_base += 4;
+
     rdpq_text_printf(NULL, 1, x_base, y_base + env_box_height - 2, " A D S R ");
     x_base += 6;
 
@@ -368,4 +383,36 @@ static char * get_osc_type_str(enum oscillator_type_e osc_type)
         default:
             return "Unknown";
     }
+}
+
+void gui_select_right(void)
+{
+    if ((NUM_WAVETABLES - 1) == selected_wav_idx)
+        selected_wav_idx = 0;
+    else
+        ++selected_wav_idx;
+}
+
+void gui_select_left(void)
+{
+    if (0 == selected_wav_idx)
+        selected_wav_idx = NUM_WAVETABLES - 1;
+    else
+        --selected_wav_idx;
+}
+
+void gui_select_up(void)
+{
+    if (0 == selected_field_main)
+        selected_field_main = 2;
+    else
+        --selected_field_main;
+}
+
+void gui_select_down(void)
+{
+    if (2 == selected_field_main)
+        selected_field_main = 0;
+    else
+        ++selected_field_main;
 }

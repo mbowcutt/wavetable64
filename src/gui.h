@@ -18,4 +18,9 @@ void gui_draw_level_meter(display_context_t disp);
 void gui_screen_next(void);
 void gui_screen_prev(void);
 
+void gui_select_right(void);
+void gui_select_left(void);
+void gui_select_up(void);
+;void gui_select_down(void);
+
 #endif
