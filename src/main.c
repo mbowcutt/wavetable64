@@ -20,12 +20,12 @@ int main(void)
 
     gui_draw_screen();
 
-    bool update_graphics = false;
+    uint8_t update_graphics_ctr = NUM_DISP_BUFFERS;
 
 	while(1) {
         if (input_poll_and_handle())
         {
-            update_graphics = true;
+            update_graphics_ctr = NUM_DISP_BUFFERS;
         }
 
         if (0u != high_watermark)
@@ -33,10 +33,10 @@ int main(void)
             gui_draw_level_meter(NULL);
         }
 
-        if (update_graphics)
+        if (update_graphics_ctr > 0)
         {
             gui_draw_screen();
-            update_graphics = false;
+            --update_graphics_ctr;
         }
     }
 
