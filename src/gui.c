@@ -26,9 +26,15 @@ static void gui_print_footer(display_context_t disp);
 static void gui_print_menu(display_context_t disp);
 static void gui_print_main(display_context_t disp);
 
-static void gui_draw_osc_type_and_amp_env(display_context_t disp,
-                                          int x_base, int y_base,
-                                          uint8_t wav_idx);
+static void gui_draw_osc_type(display_context_t disp,
+                              uint8_t wav_idx,
+                              int x_base, int y_base);
+static void gui_draw_amp_env(display_context_t disp,
+                             uint8_t wav_idx,
+                             int x_base, int y_base);
+static void gui_draw_amt_box(display_context_t disp,
+                             uint8_t wav_idx,
+                             int x_base, int y_base);
 
 static char * get_osc_type_str(enum oscillator_type_e osc_type);
 
@@ -277,8 +283,18 @@ static void gui_print_main(display_context_t disp)
 
     for (uint8_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
     {
-        gui_draw_osc_type_and_amp_env(disp, x_base, y_base,
-                                      wav_idx);
+        int x_loc = x_base;
+        int y_loc = y_base;
+        gui_draw_osc_type(disp, wav_idx, x_loc, y_loc);
+
+        y_loc += 10 + 2;
+
+        gui_draw_amp_env(disp, wav_idx, x_loc, y_loc);
+
+        y_loc += 140 + 2;
+
+        gui_draw_amt_box(disp, wav_idx, x_loc, y_loc);
+
         x_base += (62 + 4);
     }
 }
@@ -310,23 +326,29 @@ void gui_screen_prev(void)
 static uint8_t selected_wav_idx = 0;
 static uint8_t selected_field_main = 0;
 
-static void gui_draw_osc_type_and_amp_env(display_context_t disp,
-                                          int x_base, int y_base,
-                                          uint8_t wav_idx)
+static void gui_draw_osc_type(display_context_t disp,
+                              uint8_t wav_idx,
+                              int x_base, int y_base)
 {
     enum oscillator_type_e const osc_type = waveforms[wav_idx].osc;
-    struct envelope_s env = waveforms[wav_idx].amp_env;
     int const box_width = 62;
-    int const env_box_height = 140;
 
     if ((0 == selected_field_main) && (wav_idx == selected_wav_idx))
         rdpq_set_mode_fill(color_blue);
     else
         rdpq_set_mode_fill(color_gray);
+
     rdpq_fill_rectangle(x_base, y_base, x_base + box_width, y_base + 10);
     rdpq_text_printf(NULL, 1, x_base + 4, y_base + 9, "%s", get_osc_type_str(osc_type));
+}
 
-    y_base += 12;
+static void gui_draw_amp_env(display_context_t disp,
+                             uint8_t wav_idx,
+                             int x_base, int y_base)
+{
+    struct envelope_s env = waveforms[wav_idx].amp_env;
+    int const box_width = 62;
+    int const env_box_height = 140;
 
     if ((1 == selected_field_main) && (wav_idx == selected_wav_idx))
         rdpq_set_mode_fill(color_blue);
@@ -334,11 +356,6 @@ static void gui_draw_osc_type_and_amp_env(display_context_t disp,
         rdpq_set_mode_fill(color_gray);
     rdpq_fill_rectangle(x_base, y_base, x_base + box_width, y_base + env_box_height);
 
-    if ((2 == selected_field_main) && (wav_idx == selected_wav_idx))
-        rdpq_set_mode_fill(color_blue);
-    else
-        rdpq_set_mode_fill(color_gray);
-    rdpq_fill_rectangle(x_base, y_base + env_box_height + 2, x_base + box_width, y_base + env_box_height + 12);
     x_base += 4;
 
     rdpq_text_printf(NULL, 1, x_base, y_base + env_box_height - 2, " A D S R ");
@@ -364,6 +381,19 @@ static void gui_draw_osc_type_and_amp_env(display_context_t disp,
     int r_height = env.release;
     int r_pos = y_base + (env_box_height - 10) - r_height;
     rdpq_fill_rectangle(x_base, r_pos, x_base + 6, r_pos + r_height);
+}
+
+static void gui_draw_amt_box(display_context_t disp,
+                             uint8_t wav_idx,
+                             int x_base, int y_base)
+{
+    int const box_width = 62;
+
+    if ((2 == selected_field_main) && (wav_idx == selected_wav_idx))
+        rdpq_set_mode_fill(color_blue);
+    else
+        rdpq_set_mode_fill(color_gray);
+    rdpq_fill_rectangle(x_base, y_base, x_base + box_width, y_base + 10);
 }
 
 static char * get_osc_type_str(enum oscillator_type_e osc_type)
