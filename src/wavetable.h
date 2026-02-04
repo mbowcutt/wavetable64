@@ -7,7 +7,7 @@
 
 #include "envelope.h"
 
-#define NUM_WAVETABLES 5
+#define NUM_WAVETABLES 4
 
 enum oscillator_type_e {
     SINE,

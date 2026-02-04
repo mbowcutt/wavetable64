@@ -279,7 +279,7 @@ static void gui_print_main(display_context_t disp)
     {
         gui_draw_osc_type_and_amp_env(disp, x_base, y_base,
                                       wav_idx);
-        x_base += (80 + 4);
+        x_base += (62 + 4);
     }
 }
 
@@ -316,7 +316,7 @@ static void gui_draw_osc_type_and_amp_env(display_context_t disp,
 {
     enum oscillator_type_e const osc_type = waveforms[wav_idx].osc;
     struct envelope_s env = waveforms[wav_idx].amp_env;
-    int const box_width = 80;
+    int const box_width = 62;
     int const env_box_height = 140;
 
     if ((0 == selected_field_main) && (wav_idx == selected_wav_idx))
