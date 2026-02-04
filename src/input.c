@@ -66,6 +66,16 @@ bool input_poll_and_handle(void)
             gui_select_down();
             update_graphics = true;
         }
+        else if (buttons.a)
+        {
+            gui_select();
+            update_graphics = true;
+        }
+        else if (buttons.b)
+        {
+            gui_deselect();
+            update_graphics = true;
+        }
     }
 
     midi_in_bytes = midi_rx_poll(JOYPAD_PORT_1,

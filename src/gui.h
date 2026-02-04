@@ -21,6 +21,8 @@ void gui_screen_prev(void);
 void gui_select_right(void);
 void gui_select_left(void);
 void gui_select_up(void);
-;void gui_select_down(void);
+void gui_select_down(void);
+void gui_select(void);
+void gui_deselect(void);
 
 #endif

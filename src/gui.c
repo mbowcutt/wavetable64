@@ -48,6 +48,11 @@ static color_t color_black = RGBA32(0, 0, 0, 0xFF);
 static color_t color_gray = RGBA32(0x44, 0x44, 0x44, 0xFF);
 
 static enum menu_screen current_screen = SCREEN_MAIN;
+static uint8_t selected_wav_idx = 0;
+static uint8_t selected_field_main = 0;
+static uint8_t selected_subfield = 0;
+static bool field_selected = false;
+
 static rdpq_font_t * font;
 
 void gui_init(void)
@@ -309,6 +314,7 @@ void gui_screen_next(void)
     {
         ++current_screen;
     }
+    field_selected = false;
 }
 
 void gui_screen_prev(void)
@@ -321,10 +327,8 @@ void gui_screen_prev(void)
     {
         --current_screen;
     }
+    field_selected = false;
 }
-
-static uint8_t selected_wav_idx = 0;
-static uint8_t selected_field_main = 0;
 
 static void gui_draw_osc_type(display_context_t disp,
                               uint8_t wav_idx,
@@ -334,9 +338,20 @@ static void gui_draw_osc_type(display_context_t disp,
     int const box_width = 62;
 
     if ((0 == selected_field_main) && (wav_idx == selected_wav_idx))
-        rdpq_set_mode_fill(color_blue);
+    {
+        if (field_selected)
+        {
+            rdpq_set_mode_fill(color_green);
+        }
+        else
+        {
+            rdpq_set_mode_fill(color_blue);
+        }
+    }
     else
+    {
         rdpq_set_mode_fill(color_gray);
+    }
 
     rdpq_fill_rectangle(x_base, y_base, x_base + box_width, y_base + 10);
     rdpq_text_printf(NULL, 1, x_base + 4, y_base + 9, "%s", get_osc_type_str(osc_type));
@@ -351,13 +366,25 @@ static void gui_draw_amp_env(display_context_t disp,
     int const env_box_height = 140;
 
     if ((1 == selected_field_main) && (wav_idx == selected_wav_idx))
+    {
         rdpq_set_mode_fill(color_blue);
+    }
     else
+    {
         rdpq_set_mode_fill(color_gray);
+    }
     rdpq_fill_rectangle(x_base, y_base, x_base + box_width, y_base + env_box_height);
 
     x_base += 4;
 
+    if ((1 == selected_field_main)
+        && (wav_idx == selected_wav_idx)
+        && field_selected)
+    {
+        rdpq_set_mode_fill(color_green);
+        int x_loc = x_base + 6 + ((2 * selected_subfield) * 6);
+        rdpq_fill_rectangle(x_loc - 3, y_base + env_box_height - 12, x_loc + 8, y_base + env_box_height);
+    }
     rdpq_text_printf(NULL, 1, x_base, y_base + env_box_height - 2, " A D S R ");
     x_base += 6;
 
@@ -390,9 +417,20 @@ static void gui_draw_amt_box(display_context_t disp,
     int const box_width = 62;
 
     if ((2 == selected_field_main) && (wav_idx == selected_wav_idx))
-        rdpq_set_mode_fill(color_blue);
+    {
+        if (field_selected)
+        {
+            rdpq_set_mode_fill(color_green);
+        }
+        else
+        {
+            rdpq_set_mode_fill(color_blue);
+        }
+    }
     else
+    {
         rdpq_set_mode_fill(color_gray);
+    }
     rdpq_fill_rectangle(x_base, y_base, x_base + box_width, y_base + 10);
 }
 
@@ -417,32 +455,178 @@ static char * get_osc_type_str(enum oscillator_type_e osc_type)
 
 void gui_select_right(void)
 {
-    if ((NUM_WAVETABLES - 1) == selected_wav_idx)
-        selected_wav_idx = 0;
-    else
-        ++selected_wav_idx;
+    switch (current_screen)
+    {
+        case SCREEN_MAIN:
+            if (field_selected)
+            {
+                switch (selected_field_main)
+                {
+                    case 0: // oscillator
+                        if (NONE == waveforms[selected_wav_idx].osc)
+                        {
+                            waveforms[selected_wav_idx].osc = SINE;
+                        }
+                        else
+                        {
+                            ++waveforms[selected_wav_idx].osc;
+                        }
+                        break;
+                    case 1: // amp env
+                        if (3 == selected_subfield)
+                        {
+                            selected_subfield = 0;
+                        }
+                        else
+                        {
+                            ++selected_subfield;
+                        }
+                        break;
+                    case 2: // amt
+                        break;
+                    default:
+                        break;
+                }
+            }
+            else
+            {
+                if ((NUM_WAVETABLES - 1) == selected_wav_idx)
+                {
+                    selected_wav_idx = 0;
+                }
+                else
+                {
+                    ++selected_wav_idx;
+                }
+            }
+            break;
+
+        default:
+            break;
+    }
 }
 
 void gui_select_left(void)
 {
-    if (0 == selected_wav_idx)
-        selected_wav_idx = NUM_WAVETABLES - 1;
-    else
-        --selected_wav_idx;
+    switch (current_screen)
+    {
+        case SCREEN_MAIN:
+            if (field_selected)
+            {
+                switch (selected_field_main)
+                {
+                    case 0: // oscillator
+                        if (SINE == waveforms[selected_wav_idx].osc)
+                        {
+                            waveforms[selected_wav_idx].osc = NONE;
+                        }
+                        else
+                        {
+                            --waveforms[selected_wav_idx].osc;
+                        }
+                        break;
+                    case 1: // amp env
+                        if (0 == selected_subfield)
+                        {
+                            selected_subfield = 3;
+                        }
+                        else
+                        {
+                            --selected_subfield;
+                        }
+                        break;
+                    case 2: // amt
+                        break;
+                    default:
+                        break;
+                }
+            }
+            else
+            {
+                if (0 == selected_wav_idx)
+                {
+                    selected_wav_idx = NUM_WAVETABLES - 1;
+                }
+                else
+                {
+                    --selected_wav_idx;
+                }
+            }
+            break;
+
+        default:
+            break;
+    }
 }
 
 void gui_select_up(void)
 {
-    if (0 == selected_field_main)
-        selected_field_main = 2;
-    else
-        --selected_field_main;
+    switch (current_screen)
+    {
+        case SCREEN_MAIN:
+            if (field_selected)
+            {
+                // handle menu input
+            }
+            else
+            {
+                if (0 == selected_field_main)
+                {
+                    selected_field_main = 2;
+                }
+                else
+                {
+                    --selected_field_main;
+                }
+            }
+            break;
+
+        default:
+            break;
+    }
 }
 
 void gui_select_down(void)
 {
-    if (2 == selected_field_main)
-        selected_field_main = 0;
+    switch (current_screen)
+    {
+        case SCREEN_MAIN:
+            if (field_selected)
+            {
+                // handle menu input
+            }
+            else
+            {
+                if (2 == selected_field_main)
+                {
+                    selected_field_main = 0;
+                }
+                else
+                {
+                    ++selected_field_main;
+                }
+            }
+            break;
+
+        default:
+            break;
+    }
+}
+
+void gui_select(void)
+{
+    if (!field_selected)
+    {
+        field_selected = true;
+    }
     else
-        ++selected_field_main;
+    {
+        gui_deselect();
+    }
+}
+
+void gui_deselect(void)
+{
+    field_selected = false;
+    selected_subfield = 0;
 }
