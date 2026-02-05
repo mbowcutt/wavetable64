@@ -82,7 +82,17 @@ bool input_poll_and_handle(void)
         buttons = joypad_get_buttons_held(JOYPAD_PORT_1);
         if (buttons.raw)
         {
-            if (buttons.d_up)
+            if (buttons.d_right)
+            {
+                gui_select_right();
+                update_graphics = true;
+            }
+            else if (buttons.d_left)
+            {
+                gui_select_left();
+                update_graphics = true;
+            }
+            else if (buttons.d_up)
             {
                 gui_select_up();
                 update_graphics = true;

@@ -432,6 +432,10 @@ static void gui_draw_amt_box(display_context_t disp,
         rdpq_set_mode_fill(color_gray);
     }
     rdpq_fill_rectangle(x_base, y_base, x_base + box_width, y_base + 10);
+
+    int amt_width = ((box_width - 4) * waveforms[wav_idx].amt) / MIDI_MAX_DATA_BYTE;
+    rdpq_set_fill_color(color_white);
+    rdpq_fill_rectangle(x_base + 2, y_base + 2, x_base + amt_width, y_base + 8);
 }
 
 static char * get_osc_type_str(enum oscillator_type_e osc_type)
@@ -483,6 +487,8 @@ void gui_select_right(void)
                         }
                         break;
                     case 2: // amt
+                        if (MIDI_MAX_DATA_BYTE > waveforms[selected_wav_idx].amt)
+                            ++waveforms[selected_wav_idx].amt;
                         break;
                     default:
                         break;
@@ -536,6 +542,8 @@ void gui_select_left(void)
                         }
                         break;
                     case 2: // amt
+                        if (0 < waveforms[selected_wav_idx].amt)
+                            --waveforms[selected_wav_idx].amt;
                         break;
                     default:
                         break;
