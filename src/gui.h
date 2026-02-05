@@ -10,6 +10,10 @@
 
 #define NUM_DISP_BUFFERS 3
 
+extern enum menu_screen current_screen;
+extern uint8_t selected_wav_idx;
+extern uint8_t selected_field_main;
+extern uint8_t selected_subfield;
 extern bool field_selected;
 
 void gui_init(void);

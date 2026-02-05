@@ -47,10 +47,10 @@ static color_t color_white = RGBA32(0xFF, 0xFF, 0xFF, 0xFF);
 static color_t color_black = RGBA32(0, 0, 0, 0xFF);
 static color_t color_gray = RGBA32(0x44, 0x44, 0x44, 0xFF);
 
-static enum menu_screen current_screen = SCREEN_MAIN;
-static uint8_t selected_wav_idx = 0;
-static uint8_t selected_field_main = 0;
-static uint8_t selected_subfield = 0;
+enum menu_screen current_screen = SCREEN_MAIN;
+uint8_t selected_wav_idx = 0;
+uint8_t selected_field_main = 0;
+uint8_t selected_subfield = 0;
 bool field_selected = false;
 
 static rdpq_font_t * font;
