@@ -208,16 +208,30 @@ void voice_note_on(voice_t * voice, uint8_t note)
 {
     voice->note = note;
     voice->tune = wavetable_get_tune(note);
-    voice->amp_env_state[0] = ATTACK;
-    voice->amp_env_rate[0] = (UINT32_MAX - voice->amp_level[0]) / env_sample_lut[waveforms[0].amp_env.attack];
+    for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+    {
+        if (NONE != waveforms[wav_idx].osc)
+        {
+            voice->amp_env_state[wav_idx] = ATTACK;
+            voice->amp_env_rate[wav_idx]
+                = (UINT32_MAX - voice->amp_level[wav_idx])
+                    / env_sample_lut[waveforms[wav_idx].amp_env.attack];
+        }
+    }
     voice->timestamp = get_ticks();
 }
 
 void voice_note_off(voice_t * voice)
 {
-    if (IDLE != voice->amp_env_state[0])
+    for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
     {
-        voice->amp_env_state[0] = RELEASE;
-        voice->amp_env_rate[0] = (voice->amp_level[0] - 0) / env_sample_lut[waveforms[0].amp_env.release];
+        if (NONE != waveforms[wav_idx].osc)
+        {
+            if (IDLE != voice->amp_env_state[wav_idx])
+            {
+                voice->amp_env_state[wav_idx] = RELEASE;
+                voice->amp_env_rate[wav_idx] = (voice->amp_level[wav_idx] - 0) / env_sample_lut[waveforms[wav_idx].amp_env.release];
+            }
+        }
     }
 }

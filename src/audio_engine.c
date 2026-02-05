@@ -50,15 +50,17 @@ static void audio_engine_write_buffer(short * buffer, size_t num_samples)
 
                     if (NONE != wav.osc)
                     {
-                        if (IDLE == voice->amp_env_state[wav_idx])
-                            continue;
-                        short component = wavetable_get_amplitude(voice->phase,
-                                                                  wavetable_get(wav.osc));
+                        if (IDLE != voice->amp_env_state[wav_idx]
+                            && (wav.amt > 0))
+                        {
+                            short component = wavetable_get_amplitude(voice->phase,
+                                                                    wavetable_get(wav.osc));
 
-                        component = (short)(((int64_t)component * (int64_t)voice->amp_level[wav_idx]) / UINT32_MAX);
-                        component = (component * wav.amt) / MIDI_MAX_DATA_BYTE;
+                            component = (short)(((int64_t)component * (int64_t)voice->amp_level[wav_idx]) / UINT32_MAX);
+                            component = (component * wav.amt) / MIDI_MAX_DATA_BYTE;
 
-                        amplitude += component;
+                            amplitude += component;
+                        }
                     }
                 }
 
