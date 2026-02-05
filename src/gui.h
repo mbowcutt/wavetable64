@@ -1,6 +1,7 @@
 #ifndef GUI_H
 #define GUI_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #include "init.h"
@@ -9,6 +10,7 @@
 
 #define NUM_DISP_BUFFERS 3
 
+extern bool field_selected;
 
 void gui_init(void);
 void gui_draw_screen(void);

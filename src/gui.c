@@ -51,7 +51,7 @@ static enum menu_screen current_screen = SCREEN_MAIN;
 static uint8_t selected_wav_idx = 0;
 static uint8_t selected_field_main = 0;
 static uint8_t selected_subfield = 0;
-static bool field_selected = false;
+bool field_selected = false;
 
 static rdpq_font_t * font;
 
@@ -559,6 +559,8 @@ void gui_select_left(void)
     }
 }
 
+#define SUSTAIN_GRANULE (UINT32_MAX / MIDI_MAX_DATA_BYTE)
+
 void gui_select_up(void)
 {
     switch (current_screen)
@@ -566,7 +568,40 @@ void gui_select_up(void)
         case SCREEN_MAIN:
             if (field_selected)
             {
-                // handle menu input
+                switch (selected_field_main)
+                {
+                    case 0: // oscillator
+                        break;
+                    case 1: // amp env
+                        switch (selected_subfield)
+                        {
+                            case 0: // attack
+                                if (MIDI_MAX_DATA_BYTE > waveforms[selected_wav_idx].amp_env.attack)
+                                    ++waveforms[selected_wav_idx].amp_env.attack;
+                                break;
+                            case 1: // decay
+                                if (MIDI_MAX_DATA_BYTE > waveforms[selected_wav_idx].amp_env.decay)
+                                    ++waveforms[selected_wav_idx].amp_env.decay;
+                                break;
+                            case 2: // sustain
+                                if ((UINT32_MAX - SUSTAIN_GRANULE) > waveforms[selected_wav_idx].amp_env.sustain_level)
+                                    waveforms[selected_wav_idx].amp_env.sustain_level += SUSTAIN_GRANULE;
+                                else if (UINT32_MAX > waveforms[selected_wav_idx].amp_env.sustain_level)
+                                    waveforms[selected_wav_idx].amp_env.sustain_level = UINT32_MAX;
+                                break;
+                            case 3: // release
+                                if (MIDI_MAX_DATA_BYTE > waveforms[selected_wav_idx].amp_env.release)
+                                    ++waveforms[selected_wav_idx].amp_env.release;
+                                break;
+                            default:
+                                break;
+                        }
+                        break;
+                    case 2: // amt
+                        break;
+                    default:
+                        break;
+                }
             }
             else
             {
@@ -593,7 +628,40 @@ void gui_select_down(void)
         case SCREEN_MAIN:
             if (field_selected)
             {
-                // handle menu input
+                switch (selected_field_main)
+                {
+                    case 0: // oscillator
+                        break;
+                    case 1: // amp env
+                        switch (selected_subfield)
+                        {
+                            case 0: // attack
+                                if (0 < waveforms[selected_wav_idx].amp_env.attack)
+                                    --waveforms[selected_wav_idx].amp_env.attack;
+                                break;
+                            case 1: // decay
+                                if (0 < waveforms[selected_wav_idx].amp_env.decay)
+                                    --waveforms[selected_wav_idx].amp_env.decay;
+                                break;
+                            case 2: // sustain
+                                if (SUSTAIN_GRANULE < waveforms[selected_wav_idx].amp_env.sustain_level)
+                                    waveforms[selected_wav_idx].amp_env.sustain_level -= SUSTAIN_GRANULE;
+                                else if (0 < waveforms[selected_wav_idx].amp_env.sustain_level)
+                                    waveforms[selected_wav_idx].amp_env.sustain_level = 0;
+                                break;
+                            case 3: // release
+                                if (0 < waveforms[selected_wav_idx].amp_env.release)
+                                    --waveforms[selected_wav_idx].amp_env.release;
+                                break;
+                            default:
+                                break;
+                        }
+                        break;
+                    case 2: // amt
+                        break;
+                    default:
+                        break;
+                }
             }
             else
             {

@@ -77,6 +77,23 @@ bool input_poll_and_handle(void)
             update_graphics = true;
         }
     }
+    else if (field_selected)
+    {
+        buttons = joypad_get_buttons_held(JOYPAD_PORT_1);
+        if (buttons.raw)
+        {
+            if (buttons.d_up)
+            {
+                gui_select_up();
+                update_graphics = true;
+            }
+            else if (buttons.d_down)
+            {
+                gui_select_down();
+                update_graphics = true;
+            }
+        }
+    }
 
     midi_in_bytes = midi_rx_poll(JOYPAD_PORT_1,
                                  midi_in_buffer,
