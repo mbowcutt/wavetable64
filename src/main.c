@@ -28,15 +28,14 @@ int main(void)
             update_graphics_ctr = NUM_DISP_BUFFERS;
         }
 
-        if (0u != high_watermark)
-        {
-            gui_draw_level_meter(NULL);
-        }
-
         if (update_graphics_ctr > 0)
         {
             gui_draw_screen();
             --update_graphics_ctr;
+        }
+        else if (peak > 0)
+        {
+            gui_draw_level_meter(NULL);
         }
     }
 

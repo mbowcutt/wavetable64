@@ -13,78 +13,91 @@
 
 #define NUM_AUDIO_BUFFERS 4
 
-static void audio_engine_write_buffer(short * buffer, size_t num_samples);
+static void audio_engine_callback(short * buffer, size_t num_samples);
+static void audio_engine_synthesize(short * buffer, size_t num_samples);
+static inline int32_t get_next_sample(void);
+
+int32_t peak = 0;
 
 static uint8_t mix_gain_factor = 64;
-
-int32_t high_watermark = 0;
 
 void audio_engine_init(void)
 {
     audio_init(SAMPLE_RATE, NUM_AUDIO_BUFFERS);
     gui_splash(ALLOC_MIX_BUF);
 
-    audio_set_buffer_callback(audio_engine_write_buffer);
+    audio_set_buffer_callback(audio_engine_callback);
 
     // Must kick-start audio callback with dummy write
     audio_write_silence();
 }
 
-static void audio_engine_write_buffer(short * buffer, size_t num_samples)
+static void audio_engine_callback(short * buffer, size_t num_samples)
 {
-    high_watermark = 0;
-
     if (buffer && (num_samples > 0))
     {
-        for (size_t i = 0; i < (2 * num_samples); i+=2)
+        audio_engine_synthesize(buffer, num_samples);
+    }
+}
+
+void audio_engine_synthesize(short * buffer, size_t num_samples)
+{
+    if (buffer && (num_samples > 0))
+    {
+        peak = 0;
+        for (uint16_t i = 0; i < num_samples; ++i)
         {
-            int32_t amplitude = 0;
+            int32_t sample = get_next_sample();
 
-            for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
+            if ((sample > 0) && (sample > peak))
             {
-                voice_t * voice = voice_get(voice_idx);
-
-                for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
-                {
-                    wavetable_t wav = waveforms[wav_idx];
-
-                    if (NONE != wav.osc)
-                    {
-                        if (IDLE != voice->amp_env_state[wav_idx]
-                            && (wav.amt > 0))
-                        {
-                            short component = wavetable_get_amplitude(voice->phase,
-                                                                    wavetable_get(wav.osc));
-
-                            component = (short)(((int64_t)component * (int64_t)voice->amp_level[wav_idx]) / UINT32_MAX);
-                            component = (component * wav.amt) / MIDI_MAX_DATA_BYTE;
-
-                            amplitude += component;
-                        }
-                    }
-                }
-
-                // Increment phase
-                voice->phase += voice->tune;
-                voice_envelope_tick(voice);
+                peak = sample;
             }
-
-            amplitude = (amplitude * mix_gain_factor / MIDI_MAX_DATA_BYTE);
-
-            if ((amplitude > 0) && (amplitude > high_watermark))
+            else if ((sample < 0 && ((-1 * sample) > peak)))
             {
-                high_watermark = amplitude;
-            }
-            else if ((amplitude < 0 && ((-1 * amplitude) > high_watermark)))
-            {
-                high_watermark = (-1 * amplitude);
+                peak = (-1 * sample);
             }
 
             // Write stereo samples
-            buffer[i] = amplitude;
-            buffer[i+1] = amplitude;
+            // TODO: Add panning
+            buffer[i * 2] = (int16_t)sample;
+            buffer[(i * 2) + 1] = (int16_t)sample;
         }
     }
+}
+
+static inline int32_t get_next_sample(void)
+{
+    int32_t amplitude = 0;
+
+    for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
+    {
+        voice_t * voice = voice_get(voice_idx);
+
+        for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+        {
+            wavetable_t * wav = &waveforms[wav_idx];
+
+            if ((IDLE != voice->amp_env_state[wav_idx])
+                && (NONE != wav->osc)
+                && (wav->amt > 0))
+            {
+                short component = wavetable_get_amplitude(voice->phase,
+                                                          wavetable_get(wav->osc));
+
+                component = (short)(((int64_t)component * (int64_t)voice->amp_level[wav_idx]) / UINT32_MAX);
+                component = (component * wav->amt) / MIDI_MAX_DATA_BYTE;
+
+                amplitude += component;
+            }
+        }
+
+        // Increment phase
+        voice->phase += voice->tune;
+        voice_envelope_tick(voice);
+    }
+
+    return (amplitude * mix_gain_factor / MIDI_MAX_DATA_BYTE);
 }
 
 void audio_engine_set_gain(uint8_t data)

@@ -10,7 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-static voice_t voices[POLYPHONY_COUNT];
+voice_t voices[POLYPHONY_COUNT];
 
 struct envelope_s amp_env;
 
@@ -46,11 +46,6 @@ static void init_env_sample_lut(float t_min, float t_max)
         float seconds = t_min * powf(t_max / t_min, (float)idx / (float)MIDI_MAX_DATA_BYTE);
         env_sample_lut[idx] = (uint32_t)(seconds * SAMPLE_RATE);
     }
-}
-
-voice_t * voice_get(size_t voice_idx)
-{
-    return &voices[voice_idx];
 }
 
 voice_t * voice_find_next(void)
@@ -118,70 +113,6 @@ voice_t * voice_find_for_note_off(uint8_t note)
     }
 
     return voice;
-}
-
-void voice_envelope_tick(voice_t * voice)
-{
-    for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
-    {
-        if (NONE != waveforms[wav_idx].osc)
-        {
-            switch (voice->amp_env_state[wav_idx])
-            {
-                case IDLE:
-                    break;
-                case ATTACK:
-                    if (UINT32_MAX > voice->amp_level[wav_idx])
-                    {
-                        if ((UINT32_MAX - voice->amp_level[wav_idx]) < voice->amp_env_rate[wav_idx])
-                        {
-                            voice->amp_level[wav_idx] = UINT32_MAX;
-                            voice->amp_env_state[wav_idx] = DECAY;
-                            voice->amp_env_rate[wav_idx] = (UINT32_MAX - waveforms[wav_idx].amp_env.sustain_level) / env_sample_lut[waveforms[wav_idx].amp_env.decay];
-                        }
-                        else
-                        {
-                            voice->amp_level[wav_idx] += voice->amp_env_rate[wav_idx];
-                        }
-                    }
-                    break;
-                case DECAY:
-                    if (waveforms[wav_idx].amp_env.sustain_level < voice->amp_level[wav_idx])
-                    {
-                        if ((waveforms[wav_idx].amp_env.sustain_level >= voice->amp_level[wav_idx])
-                            || voice->amp_env_rate[wav_idx] > voice->amp_level[wav_idx])
-                        {
-                            voice->amp_level[wav_idx] = waveforms[wav_idx].amp_env.sustain_level;
-                            voice->amp_env_state[wav_idx] = SUSTAIN;
-                        }
-                        else
-                        {
-                            voice->amp_level[wav_idx] -= voice->amp_env_rate[wav_idx];
-                        }
-                    }
-                    break;
-                case SUSTAIN:
-                    break;
-                case RELEASE:
-                    if (0 < voice->amp_level[wav_idx])
-                    {
-                        if ((voice->amp_level[wav_idx]) < voice->amp_env_rate[wav_idx])
-                        {
-                            voice->amp_level[wav_idx] = 0;
-                            voice->amp_env_state[wav_idx] = IDLE;
-                        }
-                        else
-                        {
-                            voice->amp_level[wav_idx] -= voice->amp_env_rate[wav_idx];
-                        }
-                    }
-                    break;
-                case NUM_ENVELOPE_STATES:
-                default:
-                    break;
-            }
-        }
-    }
 }
 
 void voice_envelope_set_attack(uint8_t value)

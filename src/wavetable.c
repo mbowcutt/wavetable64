@@ -12,11 +12,6 @@
 #include <stdint.h>
 #include <math.h>
 
-#define WT_BIT_DEPTH 11 // 2048 table entries
-#define WT_SIZE (1 << WT_BIT_DEPTH)
-#define ACCUMULATOR_BITS 32
-#define FRAC_BITS (ACCUMULATOR_BITS - WT_BIT_DEPTH)
-
 static void wavetable_generate_all(void);
 static void wavetable_generate_sine(float * sum_squares);
 static void wavetable_generate_square(float target_rms, size_t num_harmonics);
@@ -27,9 +22,9 @@ static void wavetable_normalize(short * lut,
                                 float target_rms,
                                 float sum_squares);
 
-static short wavetable_interpolate(int16_t const y0,
-                                   int16_t const y1,
-                                   uint32_t const frac);
+static inline short wavetable_interpolate(int16_t const y0,
+                                          int16_t const y1,
+                                          uint32_t const frac);
 
 static void wavetable_generate_midi_freq_tbl(void);
 
@@ -46,7 +41,7 @@ static short triangle_tbl[WT_SIZE + 1];
 static short ramp_tbl[WT_SIZE + 1];
 static float temp_tbl[WT_SIZE];
 
-static short * osc_wave_tables[NUM_OSCILLATORS] =
+short * osc_wave_tables[NUM_OSCILLATORS] =
 {
     sine_tbl,
     square_tbl,
@@ -75,12 +70,6 @@ void wavetable_init(void)
     waveforms[0].osc = SINE;
     waveforms[0].amt = 127;
 }
-
-short * wavetable_get(enum oscillator_type_e osc)
-{
-    return osc_wave_tables[osc];
-}
-
 
 static void wavetable_generate_all(void)
 {
@@ -196,24 +185,6 @@ uint32_t wavetable_get_tune(uint8_t const note)
     return (uint32_t)((midi_freq_lut[note] * ((uint64_t)1 << ACCUMULATOR_BITS)) / SAMPLE_RATE);
 }
 
-short wavetable_interpolate(int16_t const y0,
-                            int16_t const y1,
-                            uint32_t const frac)
-{
-
-    return (short) (((int64_t)((int32_t)(y1 - y0) * (int32_t)frac)) >> FRAC_BITS);
-}
-
-short wavetable_get_amplitude(uint32_t const component_phase, short * wave_table)
-{
-    uint16_t const phase_int = (uint16_t const)((component_phase) >> FRAC_BITS);
-    uint32_t const phase_frac = (uint32_t const)(component_phase & ((1 << FRAC_BITS) - 1));
-
-    short const y0 = wave_table[phase_int];
-    short const y1 = wave_table[phase_int + 1];
-
-    return y0 + wavetable_interpolate(y0, y1, phase_frac);
-}
 
 // static short triangle_component(uint32_t const phase)
 // {

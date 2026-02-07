@@ -244,7 +244,7 @@ void gui_draw_level_meter(display_context_t disp)
     size_t const clip_level = total_boxes * 9 / 10;
     size_t const break_level = total_boxes * 11 / 10;
 
-    size_t num_boxes = (high_watermark * total_boxes) / INT16_MAX;
+    size_t num_boxes = (peak * total_boxes) / INT16_MAX;
 
     int x_pos = 80;
     rdpq_set_mode_fill(color_green);
