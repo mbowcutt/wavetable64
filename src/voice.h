@@ -23,7 +23,7 @@ typedef struct
 } voice_t;
 
 extern voice_t voices[POLYPHONY_COUNT];
-extern uint32_t env_sample_lut[MIDI_MAX_DATA_BYTE + 1];
+extern uint32_t env_sample_lut[MIDI_MAX_NRPN_VAL + 1];
 
 void voice_init(void);
 
@@ -50,13 +50,13 @@ static inline void voice_envelope_tick(voice_t * voice, size_t wav_idx, size_t t
         case IDLE:
             break;
         case ATTACK:
-            if (UINT32_MAX > voice->amp_level[wav_idx])
+            if (MIDI_MAX_NRPN_VAL > voice->amp_level[wav_idx])
             {
-                if ((UINT32_MAX - voice->amp_level[wav_idx]) <= (ticks * voice->amp_env_rate[wav_idx]))
+                if ((MIDI_MAX_NRPN_VAL - voice->amp_level[wav_idx]) <= (ticks * voice->amp_env_rate[wav_idx]))
                 {
-                    voice->amp_level[wav_idx] = UINT32_MAX;
+                    voice->amp_level[wav_idx] = MIDI_MAX_NRPN_VAL;
                     voice->amp_env_state[wav_idx] = DECAY;
-                    voice->amp_env_rate[wav_idx] = (UINT32_MAX - waveforms[wav_idx].amp_env.sustain_level) / env_sample_lut[waveforms[wav_idx].amp_env.decay];
+                    voice->amp_env_rate[wav_idx] = (MIDI_MAX_NRPN_VAL - waveforms[wav_idx].amp_env.sustain_level) / env_sample_lut[waveforms[wav_idx].amp_env.decay];
                 }
                 else
                 {

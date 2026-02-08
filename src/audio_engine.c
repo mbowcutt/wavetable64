@@ -91,7 +91,7 @@ static inline int32_t get_next_sample(void)
                 short component = wavetable_get_amplitude(voice->phase,
                                                           wavetable_get(wav->osc));
 
-                component = (short)(((int64_t)component * (int64_t)voice->amp_level[wav_idx]) / UINT32_MAX);
+                component = (short)(((int64_t)component * (int64_t)voice->amp_level[wav_idx]) / MIDI_MAX_NRPN_VAL);
                 component = (component * wav->amt) / MIDI_MAX_DATA_BYTE;
 
                 amplitude += component;

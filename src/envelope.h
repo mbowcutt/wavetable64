@@ -12,10 +12,10 @@ enum envelope_state_e {
 
 struct envelope_s
 {
-    uint8_t attack;
-    uint8_t decay;
-    uint32_t sustain_level;
-    uint8_t release;
+    uint16_t attack;
+    uint16_t decay;
+    uint16_t sustain_level;
+    uint16_t release;
 };
 
 #endif

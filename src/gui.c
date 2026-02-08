@@ -390,22 +390,22 @@ static void gui_draw_amp_env(display_context_t disp,
 
     rdpq_set_mode_fill(color_white);
 
-    int a_height = env.attack;
+    int a_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env.attack) / (uint64_t)MIDI_MAX_NRPN_VAL);
     int a_pos = y_base + (env_box_height - 10) - a_height;
     rdpq_fill_rectangle(x_base, a_pos, x_base + 6, a_pos + a_height);
     x_base += (2 * 6);
 
-    int d_height = env.decay;
+    int d_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env.decay) / (uint64_t)MIDI_MAX_NRPN_VAL);
     int d_pos = y_base + (env_box_height - 10) - d_height;
     rdpq_fill_rectangle(x_base, d_pos, x_base + 6, d_pos + d_height);
     x_base += (2 * 6);
 
-    int s_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env.sustain_level) / (uint64_t)UINT32_MAX);
+    int s_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env.sustain_level) / (uint64_t)MIDI_MAX_NRPN_VAL);
     int s_pos = y_base + (env_box_height - 10) - s_height;
     rdpq_fill_rectangle(x_base, s_pos, x_base + 6, s_pos + s_height);
     x_base += (2 * 6);
 
-    int r_height = env.release;
+    int r_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env.release) / (uint64_t)MIDI_MAX_NRPN_VAL);
     int r_pos = y_base + (env_box_height - 10) - r_height;
     rdpq_fill_rectangle(x_base, r_pos, x_base + 6, r_pos + r_height);
 }
@@ -567,7 +567,7 @@ void gui_select_left(void)
     }
 }
 
-#define SUSTAIN_GRANULE (UINT32_MAX / MIDI_MAX_DATA_BYTE)
+#define SUSTAIN_GRANULE (MIDI_MAX_NRPN_VAL / MIDI_MAX_DATA_BYTE)
 
 void gui_select_up(void)
 {
@@ -584,22 +584,28 @@ void gui_select_up(void)
                         switch (selected_subfield)
                         {
                             case 0: // attack
-                                if (MIDI_MAX_DATA_BYTE > waveforms[selected_wav_idx].amp_env.attack)
-                                    ++waveforms[selected_wav_idx].amp_env.attack;
+                                if ((MIDI_MAX_NRPN_VAL - SUSTAIN_GRANULE) >= waveforms[selected_wav_idx].amp_env.attack)
+                                    waveforms[selected_wav_idx].amp_env.attack += SUSTAIN_GRANULE;
+                                else if (MIDI_MAX_NRPN_VAL > waveforms[selected_wav_idx].amp_env.attack)
+                                    waveforms[selected_wav_idx].amp_env.attack = MIDI_MAX_NRPN_VAL;
                                 break;
                             case 1: // decay
-                                if (MIDI_MAX_DATA_BYTE > waveforms[selected_wav_idx].amp_env.decay)
-                                    ++waveforms[selected_wav_idx].amp_env.decay;
+                                if ((MIDI_MAX_NRPN_VAL - SUSTAIN_GRANULE) >= waveforms[selected_wav_idx].amp_env.sustain_level)
+                                    waveforms[selected_wav_idx].amp_env.decay += SUSTAIN_GRANULE;
+                                else if (MIDI_MAX_NRPN_VAL > waveforms[selected_wav_idx].amp_env.decay)
+                                    waveforms[selected_wav_idx].amp_env.decay = MIDI_MAX_NRPN_VAL;
                                 break;
                             case 2: // sustain
-                                if ((UINT32_MAX - SUSTAIN_GRANULE) > waveforms[selected_wav_idx].amp_env.sustain_level)
+                                if ((MIDI_MAX_NRPN_VAL - SUSTAIN_GRANULE) >= waveforms[selected_wav_idx].amp_env.sustain_level)
                                     waveforms[selected_wav_idx].amp_env.sustain_level += SUSTAIN_GRANULE;
-                                else if (UINT32_MAX > waveforms[selected_wav_idx].amp_env.sustain_level)
-                                    waveforms[selected_wav_idx].amp_env.sustain_level = UINT32_MAX;
+                                else if (MIDI_MAX_NRPN_VAL > waveforms[selected_wav_idx].amp_env.sustain_level)
+                                    waveforms[selected_wav_idx].amp_env.sustain_level = MIDI_MAX_NRPN_VAL;
                                 break;
                             case 3: // release
-                                if (MIDI_MAX_DATA_BYTE > waveforms[selected_wav_idx].amp_env.release)
-                                    ++waveforms[selected_wav_idx].amp_env.release;
+                                if ((MIDI_MAX_NRPN_VAL - SUSTAIN_GRANULE) >= waveforms[selected_wav_idx].amp_env.release)
+                                    waveforms[selected_wav_idx].amp_env.release += SUSTAIN_GRANULE;
+                                else if (MIDI_MAX_NRPN_VAL > waveforms[selected_wav_idx].amp_env.release)
+                                    waveforms[selected_wav_idx].amp_env.release = MIDI_MAX_NRPN_VAL;
                                 break;
                             default:
                                 break;
@@ -644,22 +650,28 @@ void gui_select_down(void)
                         switch (selected_subfield)
                         {
                             case 0: // attack
-                                if (0 < waveforms[selected_wav_idx].amp_env.attack)
-                                    --waveforms[selected_wav_idx].amp_env.attack;
+                                if (SUSTAIN_GRANULE <= waveforms[selected_wav_idx].amp_env.attack)
+                                    waveforms[selected_wav_idx].amp_env.attack -= SUSTAIN_GRANULE;
+                                else if (0 < waveforms[selected_wav_idx].amp_env.attack)
+                                    waveforms[selected_wav_idx].amp_env.attack = 0;
                                 break;
                             case 1: // decay
-                                if (0 < waveforms[selected_wav_idx].amp_env.decay)
-                                    --waveforms[selected_wav_idx].amp_env.decay;
+                                if (SUSTAIN_GRANULE <= waveforms[selected_wav_idx].amp_env.decay)
+                                    waveforms[selected_wav_idx].amp_env.decay -= SUSTAIN_GRANULE;
+                                else if (0 < waveforms[selected_wav_idx].amp_env.decay)
+                                    waveforms[selected_wav_idx].amp_env.decay = 0;
                                 break;
                             case 2: // sustain
-                                if (SUSTAIN_GRANULE < waveforms[selected_wav_idx].amp_env.sustain_level)
+                                if (SUSTAIN_GRANULE <= waveforms[selected_wav_idx].amp_env.sustain_level)
                                     waveforms[selected_wav_idx].amp_env.sustain_level -= SUSTAIN_GRANULE;
                                 else if (0 < waveforms[selected_wav_idx].amp_env.sustain_level)
                                     waveforms[selected_wav_idx].amp_env.sustain_level = 0;
                                 break;
                             case 3: // release
-                                if (0 < waveforms[selected_wav_idx].amp_env.release)
-                                    --waveforms[selected_wav_idx].amp_env.release;
+                                if (SUSTAIN_GRANULE <= waveforms[selected_wav_idx].amp_env.release)
+                                    waveforms[selected_wav_idx].amp_env.release -= SUSTAIN_GRANULE;
+                                else if (0 < waveforms[selected_wav_idx].amp_env.release)
+                                    waveforms[selected_wav_idx].amp_env.release = 0;
                                 break;
                             default:
                                 break;
