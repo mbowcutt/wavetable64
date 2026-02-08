@@ -14,7 +14,7 @@ struct envelope_s
 {
     uint16_t attack;
     uint16_t decay;
-    uint16_t sustain_level;
+    uint32_t sustain_level;
     uint16_t release;
 };
 

@@ -63,7 +63,7 @@ void wavetable_init(void)
         wav->osc = NONE;
         wav->amp_env.attack = 0;
         wav->amp_env.decay = 0;
-        wav->amp_env.sustain_level = MIDI_MAX_NRPN_VAL / 2;
+        wav->amp_env.sustain_level = UINT32_MAX / 2;
         wav->amp_env.release = 0;
         wav->amt = 0;
     }

@@ -14,7 +14,7 @@ voice_t voices[POLYPHONY_COUNT];
 
 struct envelope_s amp_env;
 
-uint32_t env_sample_lut[MIDI_MAX_NRPN_VAL + 1] = {0};
+uint64_t env_sample_lut[MIDI_MAX_NRPN_VAL + 1] = {0};
 
 static void init_env_sample_lut(float t_min, float t_max);
 
@@ -44,7 +44,7 @@ static void init_env_sample_lut(float t_min, float t_max)
     for (size_t idx = 0; idx <= MIDI_MAX_NRPN_VAL; ++idx)
     {
         float seconds = t_min * powf(t_max / t_min, (float)idx / (float)MIDI_MAX_NRPN_VAL);
-        env_sample_lut[idx] = (uint32_t)(seconds * SAMPLE_RATE);
+        env_sample_lut[idx] = (uint64_t)(seconds * SAMPLE_RATE);
     }
 }
 
@@ -127,7 +127,7 @@ void voice_envelope_set_decay(uint8_t value)
 
 void voice_envelope_set_sustain(uint8_t value)
 {
-    waveforms[0].amp_env.sustain_level = ((uint16_t)value << 7);
+    waveforms[0].amp_env.sustain_level = ((((uint64_t)value) << 7) * UINT32_MAX) / MIDI_MAX_NRPN_VAL;
 }
 
 void voice_envelope_set_release(uint8_t value)
@@ -145,7 +145,7 @@ void voice_note_on(voice_t * voice, uint8_t note)
         {
             voice->amp_env_state[wav_idx] = ATTACK;
             voice->amp_env_rate[wav_idx]
-                = (MIDI_MAX_NRPN_VAL - voice->amp_level[wav_idx])
+                = (UINT32_MAX - voice->amp_level[wav_idx])
                     / env_sample_lut[waveforms[wav_idx].amp_env.attack];
         }
     }
