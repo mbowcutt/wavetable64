@@ -36,7 +36,7 @@ void voice_init(void)
         }
     }
 
-    init_env_sample_lut(0.005f, 10.0f);
+    init_env_sample_lut(0.001f, 10.0f);
 }
 
 static void init_env_sample_lut(float t_min, float t_max)

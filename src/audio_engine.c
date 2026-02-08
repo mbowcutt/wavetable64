@@ -50,10 +50,7 @@ void audio_engine_synthesize(short * buffer, size_t num_samples)
         {
             int32_t sample = get_next_sample();
 
-            if (0 == (i % 16))
-            {
-                tick_envelopes(16);
-            }
+            tick_envelopes(1);
 
             if ((sample > 0) && (sample > peak))
             {

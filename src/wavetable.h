@@ -7,7 +7,7 @@
 
 #include "envelope.h"
 
-#define NUM_WAVETABLES 4
+#define NUM_WAVETABLES 2
 #define WT_BIT_DEPTH 11 // 2048 table entries
 #define WT_SIZE (1 << WT_BIT_DEPTH)
 #define ACCUMULATOR_BITS 32
