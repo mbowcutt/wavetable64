@@ -43,69 +43,62 @@ static inline voice_t * voice_get(size_t voice_idx)
     return &voices[voice_idx];
 }
 
-static inline void voice_envelope_tick(voice_t * voice)
+static inline void voice_envelope_tick(voice_t * voice, size_t wav_idx, size_t ticks)
 {
-    for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+    switch (voice->amp_env_state[wav_idx])
     {
-        if (NONE != waveforms[wav_idx].osc)
-        {
-            switch (voice->amp_env_state[wav_idx])
+        case IDLE:
+            break;
+        case ATTACK:
+            if (UINT32_MAX > voice->amp_level[wav_idx])
             {
-                case IDLE:
-                    break;
-                case ATTACK:
-                    if (UINT32_MAX > voice->amp_level[wav_idx])
-                    {
-                        if ((UINT32_MAX - voice->amp_level[wav_idx]) < voice->amp_env_rate[wav_idx])
-                        {
-                            voice->amp_level[wav_idx] = UINT32_MAX;
-                            voice->amp_env_state[wav_idx] = DECAY;
-                            voice->amp_env_rate[wav_idx] = (UINT32_MAX - waveforms[wav_idx].amp_env.sustain_level) / env_sample_lut[waveforms[wav_idx].amp_env.decay];
-                        }
-                        else
-                        {
-                            voice->amp_level[wav_idx] += voice->amp_env_rate[wav_idx];
-                        }
-                    }
-                    break;
-                case DECAY:
-                    if (waveforms[wav_idx].amp_env.sustain_level < voice->amp_level[wav_idx])
-                    {
-                        if ((waveforms[wav_idx].amp_env.sustain_level >= voice->amp_level[wav_idx])
-                            || voice->amp_env_rate[wav_idx] > voice->amp_level[wav_idx])
-                        {
-                            voice->amp_level[wav_idx] = waveforms[wav_idx].amp_env.sustain_level;
-                            voice->amp_env_state[wav_idx] = SUSTAIN;
-                        }
-                        else
-                        {
-                            voice->amp_level[wav_idx] -= voice->amp_env_rate[wav_idx];
-                        }
-                    }
-                    break;
-                case SUSTAIN:
-                    break;
-                case RELEASE:
-                    if (0 < voice->amp_level[wav_idx])
-                    {
-                        if ((voice->amp_level[wav_idx]) < voice->amp_env_rate[wav_idx])
-                        {
-                            voice->amp_level[wav_idx] = 0;
-                            voice->amp_env_state[wav_idx] = IDLE;
-                        }
-                        else
-                        {
-                            voice->amp_level[wav_idx] -= voice->amp_env_rate[wav_idx];
-                        }
-                    }
-                    break;
-                case NUM_ENVELOPE_STATES:
-                default:
-                    break;
+                if ((UINT32_MAX - voice->amp_level[wav_idx]) <= (ticks * voice->amp_env_rate[wav_idx]))
+                {
+                    voice->amp_level[wav_idx] = UINT32_MAX;
+                    voice->amp_env_state[wav_idx] = DECAY;
+                    voice->amp_env_rate[wav_idx] = (UINT32_MAX - waveforms[wav_idx].amp_env.sustain_level) / env_sample_lut[waveforms[wav_idx].amp_env.decay];
+                }
+                else
+                {
+                    voice->amp_level[wav_idx] += (ticks * voice->amp_env_rate[wav_idx]);
+                }
             }
-        }
+            break;
+        case DECAY:
+            if (waveforms[wav_idx].amp_env.sustain_level < voice->amp_level[wav_idx])
+            {
+                if ((voice->amp_level[wav_idx] - waveforms[wav_idx].amp_env.sustain_level)
+                    <= (ticks * voice->amp_env_rate[wav_idx]))
+                {
+                    voice->amp_level[wav_idx] = waveforms[wav_idx].amp_env.sustain_level;
+                    voice->amp_env_state[wav_idx] = SUSTAIN;
+                }
+                else
+                {
+                    voice->amp_level[wav_idx] -= (ticks * voice->amp_env_rate[wav_idx]);
+                }
+            }
+            break;
+        case SUSTAIN:
+            break;
+        case RELEASE:
+            if (0 < voice->amp_level[wav_idx])
+            {
+                if ((voice->amp_level[wav_idx]) <= (ticks * voice->amp_env_rate[wav_idx]))
+                {
+                    voice->amp_level[wav_idx] = 0;
+                    voice->amp_env_state[wav_idx] = IDLE;
+                }
+                else
+                {
+                    voice->amp_level[wav_idx] -= (ticks * voice->amp_env_rate[wav_idx]);
+                }
+            }
+            break;
+        case NUM_ENVELOPE_STATES:
+        default:
+            break;
     }
 }
-
 
 #endif

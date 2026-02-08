@@ -16,6 +16,7 @@
 static void audio_engine_callback(short * buffer, size_t num_samples);
 static void audio_engine_synthesize(short * buffer, size_t num_samples);
 static inline int32_t get_next_sample(void);
+static inline void tick_envelopes(size_t num_ticks);
 
 int32_t peak = 0;
 
@@ -48,6 +49,11 @@ void audio_engine_synthesize(short * buffer, size_t num_samples)
         for (uint16_t i = 0; i < num_samples; ++i)
         {
             int32_t sample = get_next_sample();
+
+            if (0 == (i % 16))
+            {
+                tick_envelopes(16);
+            }
 
             if ((sample > 0) && (sample > peak))
             {
@@ -94,10 +100,25 @@ static inline int32_t get_next_sample(void)
 
         // Increment phase
         voice->phase += voice->tune;
-        voice_envelope_tick(voice);
     }
 
     return (amplitude * mix_gain_factor / MIDI_MAX_DATA_BYTE);
+}
+
+static inline void tick_envelopes(size_t num_ticks)
+{
+    for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
+    {
+        voice_t * voice = voice_get(voice_idx);
+        for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+        {
+            if ((IDLE != voice->amp_env_state[wav_idx])
+                && (NONE != waveforms[wav_idx].osc))
+            {
+                voice_envelope_tick(voice, wav_idx, num_ticks);
+            }
+        }
+    }
 }
 
 void audio_engine_set_gain(uint8_t data)
