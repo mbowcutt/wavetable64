@@ -35,12 +35,18 @@ static void wavetable_generate_midi_freq_tbl(void);
 
 static float midi_freq_lut[MIDI_MAX_DATA_BYTE + 1];
 
+/// Arrays for oscillator lookup tables. One additional sample is added to the
+/// end to simplify interpolation step, as we won't need to check for wrapping.
 static short sine_tbl[WT_SIZE + 1];
 static short square_tbl[WT_SIZE + 1];
 static short triangle_tbl[WT_SIZE + 1];
 static short ramp_tbl[WT_SIZE + 1];
+
+/// Temporary array used in generating lookup tables. Type is floating-point
+/// for greater accuracy pre-RMS normalization. Additional sample not needed.
 static float temp_tbl[WT_SIZE];
 
+/// Array of pointers to osillaor lookup tables.
 short * osc_wave_tables[NUM_OSCILLATORS] =
 {
     sine_tbl,
@@ -49,9 +55,13 @@ short * osc_wave_tables[NUM_OSCILLATORS] =
     ramp_tbl
 };
 
+/// Storage location for waveforms/voice components.
 wavetable_t waveforms[NUM_WAVETABLES];
 
 
+/// Initialize wavetable components.
+/// Generates all wavetables and the midi to frequency lookup table.
+/// Initializes a single sine wave voice with 50% sustain level.
 void wavetable_init(void)
 {
     wavetable_generate_all();
@@ -71,6 +81,8 @@ void wavetable_init(void)
     waveforms[0].amt = 127;
 }
 
+/// Genarates all oscillator lookup tables and RMS normalizes them to the same
+/// level of perceived loudness.
 static void wavetable_generate_all(void)
 {
     float sum_squares = 0;
@@ -91,6 +103,10 @@ static void wavetable_generate_all(void)
     wavetable_generate_ramp(target_rms, num_harmonics);
 }
 
+/// Generate a sine wave lookup table.
+/// Returns the sum of squares, used to calculate RMS to normalize the other
+/// wavetables so they sound consistently loud.
+/// Target amplitude is -6 dbFS, or 1/2 the 16 bit wide sample space.
 static void wavetable_generate_sine(float * sum_squares)
 {
     float const phase_step = (2.0f * M_PI) / WT_SIZE;
@@ -106,6 +122,8 @@ static void wavetable_generate_sine(float * sum_squares)
     sine_tbl[WT_SIZE] = sine_tbl[0];
 }
 
+/// Generates a band-limited square wave lookup table.
+/// Formula: Sum of odd harmonics (h) with amplitudes scaled by 1/h.
 static void wavetable_generate_square(float target_rms, size_t num_harmonics)
 {
     float const phase_step = (2.0f * M_PI) / WT_SIZE;
@@ -125,6 +143,9 @@ static void wavetable_generate_square(float target_rms, size_t num_harmonics)
     wavetable_normalize(square_tbl, target_rms, sum_squares);
 }
 
+/// Generates a band-limited triangle wave lookup table.
+/// Formula: Sum of odd harmonics (h) with amplitudes scaled by 1/h^2 
+/// and alternating phase (sign flip).
 static void wavetable_generate_triangle(float target_rms, size_t num_harmonics)
 {
     float const phase_step = (2.0f * M_PI) / WT_SIZE;
@@ -146,6 +167,8 @@ static void wavetable_generate_triangle(float target_rms, size_t num_harmonics)
     wavetable_normalize(triangle_tbl, target_rms, sum_squares);
 }
 
+/// Generates a band-limited ramp (sawtooth) wave lookup table.
+/// Formula: Sum of all harmonics (h) with amplitudes scaled by 1/h.
 static void wavetable_generate_ramp(float target_rms, size_t num_harmonics)
 {
     float const phase_step = (2.0f * M_PI) / WT_SIZE;
@@ -165,6 +188,8 @@ static void wavetable_generate_ramp(float target_rms, size_t num_harmonics)
     wavetable_normalize(ramp_tbl, target_rms, sum_squares);
 }
 
+/// Adjusts a given lookup table to match a target RMS, given the sum of
+/// squares of the input table.
 static void wavetable_normalize(short * lut, float target_rms, float sum_squares)
 {
     float const rms = sqrtf(sum_squares / WT_SIZE);
@@ -180,6 +205,14 @@ static void wavetable_normalize(short * lut, float target_rms, float sum_squares
     lut[WT_SIZE] = lut[0];
 }
 
+
+/// Get the tune or stride value for the given note.
+/// This looks up the note frequency from midi_freq_lut and calculates the
+/// step rate through the accumulator. The phase accumulator should increment
+/// by this value between each sample.
+/// One pass through every 32 bit value represents one complete cycle. The step
+/// rate is calculated by multiplying the frequency by the total number of
+/// accumulator values (UINT32_MAX + 1), and dividing by the sample rate.
 uint32_t wavetable_get_tune(uint8_t const note)
 {
     return (uint32_t)((midi_freq_lut[note] * ((uint64_t)1 << ACCUMULATOR_BITS)) / SAMPLE_RATE);
@@ -214,10 +247,17 @@ uint32_t wavetable_get_tune(uint8_t const note)
 //     return (short)((phase) >> 16);
 // }
 
+/// Generate MIDI note to frequency lookup table.
+/// Produces an array midi_freq_lut of type float, where the index is the MIDI
+/// note number [0,127] and the value is the frequency in Hz.
+///
+/// The table is based off Middle A (440 Hz) being note 69. Each octave up or
+/// down doubles or halves the frequency. Thus, the equation for each note's
+/// frequency is given by 440 * 2^((note_idx - 69)/12)
 static void wavetable_generate_midi_freq_tbl(void)
 {
-    for (int idx = 0; idx <= MIDI_MAX_DATA_BYTE; ++idx)
+    for (int note_idx = 0; note_idx <= MIDI_MAX_DATA_BYTE; ++note_idx)
     {
-        midi_freq_lut[idx] = 440.0f * powf(2.0f, ((float)idx - 69) / 12.0f);
+        midi_freq_lut[note_idx] = 440.0f * powf(2.0f, ((float)note_idx - 69) / 12.0f);
     }
 }
