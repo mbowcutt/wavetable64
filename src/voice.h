@@ -16,7 +16,7 @@ typedef struct
     uint8_t note;
     uint32_t phase;
     uint32_t tune;
-    enum envelope_state_e amp_env_state[NUM_WAVETABLES];
+    enum envelope_stage_e amp_env_state[NUM_WAVETABLES];
     uint32_t amp_level[NUM_WAVETABLES];
     uint64_t amp_env_rate[NUM_WAVETABLES];
     uint64_t timestamp;
@@ -95,7 +95,7 @@ static inline void voice_envelope_tick(voice_t * voice, size_t wav_idx, size_t t
                 }
             }
             break;
-        case NUM_ENVELOPE_STATES:
+        case NUM_ENVELOPE_STAGES:
         default:
             break;
     }
