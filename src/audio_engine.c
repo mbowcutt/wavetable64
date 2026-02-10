@@ -61,6 +61,11 @@ void audio_engine_synthesize(short * buffer, size_t num_samples)
                 peak = (-1 * sample);
             }
 
+            if (sample > INT16_MAX)
+                sample = INT16_MAX;
+            else if (sample < INT16_MIN)
+                sample = INT16_MIN;
+
             // Write stereo samples
             // TODO: Add panning
             buffer[i * 2] = (int16_t)sample;
