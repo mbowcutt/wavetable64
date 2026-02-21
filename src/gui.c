@@ -334,7 +334,7 @@ static void gui_draw_osc_type(display_context_t disp,
                               uint8_t wav_idx,
                               int x_base, int y_base)
 {
-    enum oscillator_type_e const osc_type = waveforms[wav_idx].osc;
+    enum oscillator_type_e const osc_type = oscillators[wav_idx].osc;
     int const box_width = 62;
 
     if ((0 == selected_field_main) && (wav_idx == selected_wav_idx))
@@ -361,7 +361,7 @@ static void gui_draw_amp_env(display_context_t disp,
                              uint8_t wav_idx,
                              int x_base, int y_base)
 {
-    struct envelope_s env = waveforms[wav_idx].amp_env;
+    struct envelope_s * env = oscillators[wav_idx].amp_env;
     int const box_width = 62;
     int const env_box_height = 140;
 
@@ -390,22 +390,22 @@ static void gui_draw_amp_env(display_context_t disp,
 
     rdpq_set_mode_fill(color_white);
 
-    int a_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env.attack) / (uint64_t)MIDI_MAX_NRPN_VAL);
+    int a_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env->attack) / (uint64_t)MIDI_MAX_NRPN_VAL);
     int a_pos = y_base + (env_box_height - 10) - a_height;
     rdpq_fill_rectangle(x_base, a_pos, x_base + 6, a_pos + a_height);
     x_base += (2 * 6);
 
-    int d_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env.decay) / (uint64_t)MIDI_MAX_NRPN_VAL);
+    int d_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env->decay) / (uint64_t)MIDI_MAX_NRPN_VAL);
     int d_pos = y_base + (env_box_height - 10) - d_height;
     rdpq_fill_rectangle(x_base, d_pos, x_base + 6, d_pos + d_height);
     x_base += (2 * 6);
 
-    int s_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env.sustain_level) / (uint64_t)UINT32_MAX);
+    int s_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env->sustain_level) / (uint64_t)UINT32_MAX);
     int s_pos = y_base + (env_box_height - 10) - s_height;
     rdpq_fill_rectangle(x_base, s_pos, x_base + 6, s_pos + s_height);
     x_base += (2 * 6);
 
-    int r_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env.release) / (uint64_t)MIDI_MAX_NRPN_VAL);
+    int r_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env->release) / (uint64_t)MIDI_MAX_NRPN_VAL);
     int r_pos = y_base + (env_box_height - 10) - r_height;
     rdpq_fill_rectangle(x_base, r_pos, x_base + 6, r_pos + r_height);
 }
@@ -433,7 +433,7 @@ static void gui_draw_amt_box(display_context_t disp,
     }
     rdpq_fill_rectangle(x_base, y_base, x_base + box_width, y_base + 10);
 
-    int amt_width = ((box_width - 4) * waveforms[wav_idx].amt) / MIDI_MAX_DATA_BYTE;
+    int amt_width = ((box_width - 4) * oscillators[wav_idx].amt) / MIDI_MAX_DATA_BYTE;
     rdpq_set_fill_color(color_white);
     rdpq_fill_rectangle(x_base + 2, y_base + 2, x_base + amt_width, y_base + 8);
 }
@@ -467,13 +467,13 @@ void gui_select_right(void)
                 switch (selected_field_main)
                 {
                     case 0: // oscillator
-                        if (NONE == waveforms[selected_wav_idx].osc)
+                        if (NONE == oscillators[selected_wav_idx].osc)
                         {
-                            waveforms[selected_wav_idx].osc = SINE;
+                            oscillators[selected_wav_idx].osc = SINE;
                         }
                         else
                         {
-                            ++waveforms[selected_wav_idx].osc;
+                            ++oscillators[selected_wav_idx].osc;
                         }
                         break;
                     case 1: // amp env
@@ -487,8 +487,8 @@ void gui_select_right(void)
                         }
                         break;
                     case 2: // amt
-                        if (MIDI_MAX_DATA_BYTE > waveforms[selected_wav_idx].amt)
-                            ++waveforms[selected_wav_idx].amt;
+                        if (MIDI_MAX_DATA_BYTE > oscillators[selected_wav_idx].amt)
+                            ++oscillators[selected_wav_idx].amt;
                         break;
                     default:
                         break;
@@ -522,13 +522,13 @@ void gui_select_left(void)
                 switch (selected_field_main)
                 {
                     case 0: // oscillator
-                        if (SINE == waveforms[selected_wav_idx].osc)
+                        if (SINE == oscillators[selected_wav_idx].osc)
                         {
-                            waveforms[selected_wav_idx].osc = NONE;
+                            oscillators[selected_wav_idx].osc = NONE;
                         }
                         else
                         {
-                            --waveforms[selected_wav_idx].osc;
+                            --oscillators[selected_wav_idx].osc;
                         }
                         break;
                     case 1: // amp env
@@ -542,8 +542,8 @@ void gui_select_left(void)
                         }
                         break;
                     case 2: // amt
-                        if (0 < waveforms[selected_wav_idx].amt)
-                            --waveforms[selected_wav_idx].amt;
+                        if (0 < oscillators[selected_wav_idx].amt)
+                            --oscillators[selected_wav_idx].amt;
                         break;
                     default:
                         break;
@@ -585,28 +585,28 @@ void gui_select_up(void)
                         switch (selected_subfield)
                         {
                             case 0: // attack
-                                if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= waveforms[selected_wav_idx].amp_env.attack)
-                                    waveforms[selected_wav_idx].amp_env.attack += ENV_RATE_GRANULE;
-                                else if (MIDI_MAX_NRPN_VAL > waveforms[selected_wav_idx].amp_env.attack)
-                                    waveforms[selected_wav_idx].amp_env.attack = MIDI_MAX_NRPN_VAL;
+                                if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= oscillators[selected_wav_idx].amp_env->attack)
+                                    oscillators[selected_wav_idx].amp_env->attack += ENV_RATE_GRANULE;
+                                else if (MIDI_MAX_NRPN_VAL > oscillators[selected_wav_idx].amp_env->attack)
+                                    oscillators[selected_wav_idx].amp_env->attack = MIDI_MAX_NRPN_VAL;
                                 break;
                             case 1: // decay
-                                if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= waveforms[selected_wav_idx].amp_env.sustain_level)
-                                    waveforms[selected_wav_idx].amp_env.decay += ENV_RATE_GRANULE;
-                                else if (MIDI_MAX_NRPN_VAL > waveforms[selected_wav_idx].amp_env.decay)
-                                    waveforms[selected_wav_idx].amp_env.decay = MIDI_MAX_NRPN_VAL;
+                                if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= oscillators[selected_wav_idx].amp_env->sustain_level)
+                                    oscillators[selected_wav_idx].amp_env->decay += ENV_RATE_GRANULE;
+                                else if (MIDI_MAX_NRPN_VAL > oscillators[selected_wav_idx].amp_env->decay)
+                                    oscillators[selected_wav_idx].amp_env->decay = MIDI_MAX_NRPN_VAL;
                                 break;
                             case 2: // sustain
-                                if ((UINT32_MAX - SUSTAIN_GRANULE) >= waveforms[selected_wav_idx].amp_env.sustain_level)
-                                    waveforms[selected_wav_idx].amp_env.sustain_level += SUSTAIN_GRANULE;
-                                else if (UINT32_MAX > waveforms[selected_wav_idx].amp_env.sustain_level)
-                                    waveforms[selected_wav_idx].amp_env.sustain_level = UINT32_MAX;
+                                if ((UINT32_MAX - SUSTAIN_GRANULE) >= oscillators[selected_wav_idx].amp_env->sustain_level)
+                                    oscillators[selected_wav_idx].amp_env->sustain_level += SUSTAIN_GRANULE;
+                                else if (UINT32_MAX > oscillators[selected_wav_idx].amp_env->sustain_level)
+                                    oscillators[selected_wav_idx].amp_env->sustain_level = UINT32_MAX;
                                 break;
                             case 3: // release
-                                if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= waveforms[selected_wav_idx].amp_env.release)
-                                    waveforms[selected_wav_idx].amp_env.release += ENV_RATE_GRANULE;
-                                else if (MIDI_MAX_NRPN_VAL > waveforms[selected_wav_idx].amp_env.release)
-                                    waveforms[selected_wav_idx].amp_env.release = MIDI_MAX_NRPN_VAL;
+                                if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= oscillators[selected_wav_idx].amp_env->release)
+                                    oscillators[selected_wav_idx].amp_env->release += ENV_RATE_GRANULE;
+                                else if (MIDI_MAX_NRPN_VAL > oscillators[selected_wav_idx].amp_env->release)
+                                    oscillators[selected_wav_idx].amp_env->release = MIDI_MAX_NRPN_VAL;
                                 break;
                             default:
                                 break;
@@ -651,28 +651,28 @@ void gui_select_down(void)
                         switch (selected_subfield)
                         {
                             case 0: // attack
-                                if (ENV_RATE_GRANULE <= waveforms[selected_wav_idx].amp_env.attack)
-                                    waveforms[selected_wav_idx].amp_env.attack -= ENV_RATE_GRANULE;
-                                else if (0 < waveforms[selected_wav_idx].amp_env.attack)
-                                    waveforms[selected_wav_idx].amp_env.attack = 0;
+                                if (ENV_RATE_GRANULE <= oscillators[selected_wav_idx].amp_env->attack)
+                                    oscillators[selected_wav_idx].amp_env->attack -= ENV_RATE_GRANULE;
+                                else if (0 < oscillators[selected_wav_idx].amp_env->attack)
+                                    oscillators[selected_wav_idx].amp_env->attack = 0;
                                 break;
                             case 1: // decay
-                                if (ENV_RATE_GRANULE <= waveforms[selected_wav_idx].amp_env.decay)
-                                    waveforms[selected_wav_idx].amp_env.decay -= ENV_RATE_GRANULE;
-                                else if (0 < waveforms[selected_wav_idx].amp_env.decay)
-                                    waveforms[selected_wav_idx].amp_env.decay = 0;
+                                if (ENV_RATE_GRANULE <= oscillators[selected_wav_idx].amp_env->decay)
+                                    oscillators[selected_wav_idx].amp_env->decay -= ENV_RATE_GRANULE;
+                                else if (0 < oscillators[selected_wav_idx].amp_env->decay)
+                                    oscillators[selected_wav_idx].amp_env->decay = 0;
                                 break;
                             case 2: // sustain
-                                if (SUSTAIN_GRANULE <= waveforms[selected_wav_idx].amp_env.sustain_level)
-                                    waveforms[selected_wav_idx].amp_env.sustain_level -= SUSTAIN_GRANULE;
-                                else if (0 < waveforms[selected_wav_idx].amp_env.sustain_level)
-                                    waveforms[selected_wav_idx].amp_env.sustain_level = 0;
+                                if (SUSTAIN_GRANULE <= oscillators[selected_wav_idx].amp_env->sustain_level)
+                                    oscillators[selected_wav_idx].amp_env->sustain_level -= SUSTAIN_GRANULE;
+                                else if (0 < oscillators[selected_wav_idx].amp_env->sustain_level)
+                                    oscillators[selected_wav_idx].amp_env->sustain_level = 0;
                                 break;
                             case 3: // release
-                                if (ENV_RATE_GRANULE <= waveforms[selected_wav_idx].amp_env.release)
-                                    waveforms[selected_wav_idx].amp_env.release -= ENV_RATE_GRANULE;
-                                else if (0 < waveforms[selected_wav_idx].amp_env.release)
-                                    waveforms[selected_wav_idx].amp_env.release = 0;
+                                if (ENV_RATE_GRANULE <= oscillators[selected_wav_idx].amp_env->release)
+                                    oscillators[selected_wav_idx].amp_env->release -= ENV_RATE_GRANULE;
+                                else if (0 < oscillators[selected_wav_idx].amp_env->release)
+                                    oscillators[selected_wav_idx].amp_env->release = 0;
                                 break;
                             default:
                                 break;

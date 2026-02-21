@@ -4,6 +4,8 @@
 #include <midi.h>
 #include <stdint.h>
 
+#define NUM_ENVELOPES 3
+
 /// Enum representing each envelope stage.
 enum envelope_stage_e {
     IDLE,
@@ -34,6 +36,7 @@ struct envelope_state_s
 };
 
 extern uint64_t env_sample_lut[MIDI_MAX_NRPN_VAL + 1];
+extern struct envelope_s envelopes[NUM_ENVELOPES];
 
 void envelope_init(void);
 

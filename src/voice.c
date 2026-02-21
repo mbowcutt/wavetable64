@@ -11,8 +11,6 @@
 
 voice_t voices[POLYPHONY_COUNT];
 
-struct envelope_s amp_env;
-
 void voice_init(void)
 {
     for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
@@ -50,7 +48,7 @@ voice_t * voice_find_next(void)
         // If any waveform is active & non-IDLE, do not select it.
         for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
         {
-            if ((NONE != waveforms[wav_idx].osc)
+            if ((NONE != oscillators[wav_idx].osc)
                 && (IDLE != voices[voice_idx].amp_env_state[wav_idx].stage))
             {
                 break;
@@ -83,11 +81,11 @@ voice_t * voice_find_for_note_off(uint8_t note)
         if ((note == voices[voice_idx].note)
             && ((!voice) || (voices[voice_idx].timestamp < voice->timestamp)))
         {
-            // If any of the active waveforms are not IDLE or RELEASE,
+            // If any of the active oscillators are not IDLE or RELEASE,
             // the note is active - select it.
             for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
             {
-                if ((NONE != waveforms[wav_idx].osc)
+                if ((NONE != oscillators[wav_idx].osc)
                     && (IDLE != voices[voice_idx].amp_env_state[wav_idx].stage)
                     && (RELEASE != voices[voice_idx].amp_env_state[wav_idx].stage))
                 {
@@ -103,22 +101,22 @@ voice_t * voice_find_for_note_off(uint8_t note)
 
 void voice_envelope_set_attack(uint8_t value)
 {
-    waveforms[0].amp_env.attack = ((uint16_t)value << 7);
+    oscillators[0].amp_env->attack = ((uint16_t)value << 7);
 }
 
 void voice_envelope_set_decay(uint8_t value)
 {
-    waveforms[0].amp_env.decay = ((uint16_t)value << 7);
+    oscillators[0].amp_env->decay = ((uint16_t)value << 7);
 }
 
 void voice_envelope_set_sustain(uint8_t value)
 {
-    waveforms[0].amp_env.sustain_level = ((((uint64_t)value) << 7) * UINT32_MAX) / MIDI_MAX_NRPN_VAL;
+    oscillators[0].amp_env->sustain_level = ((((uint64_t)value) << 7) * UINT32_MAX) / MIDI_MAX_NRPN_VAL;
 }
 
 void voice_envelope_set_release(uint8_t value)
 {
-    waveforms[0].amp_env.release = ((uint16_t)value << 7);
+    oscillators[0].amp_env->release = ((uint16_t)value << 7);
 }
 
 void voice_note_on(voice_t * voice, uint8_t note)
@@ -127,12 +125,12 @@ void voice_note_on(voice_t * voice, uint8_t note)
     voice->tune = wavetable_get_tune(note);
     for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
     {
-        if (NONE != waveforms[wav_idx].osc)
+        if (NONE != oscillators[wav_idx].osc)
         {
             voice->amp_env_state[wav_idx].stage = ATTACK;
             voice->amp_env_state[wav_idx].rate
                 = (UINT32_MAX - voice->amp_env_state[wav_idx].level)
-                    / env_sample_lut[waveforms[wav_idx].amp_env.attack];
+                    / env_sample_lut[oscillators[wav_idx].amp_env->attack];
         }
     }
     voice->timestamp = get_ticks();
@@ -142,12 +140,12 @@ void voice_note_off(voice_t * voice)
 {
     for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
     {
-        if (NONE != waveforms[wav_idx].osc)
+        if (NONE != oscillators[wav_idx].osc)
         {
             if (IDLE != voice->amp_env_state[wav_idx].stage)
             {
                 voice->amp_env_state[wav_idx].stage = RELEASE;
-                voice->amp_env_state[wav_idx].rate = (voice->amp_env_state[wav_idx].level - 0) / env_sample_lut[waveforms[wav_idx].amp_env.release];
+                voice->amp_env_state[wav_idx].rate = (voice->amp_env_state[wav_idx].level - 0) / env_sample_lut[oscillators[wav_idx].amp_env->release];
             }
         }
     }

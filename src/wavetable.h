@@ -28,11 +28,11 @@ enum oscillator_type_e {
 /// Includes an oscillator type, amp envelope, and mix amount.
 typedef struct {
     enum oscillator_type_e osc;
-    struct envelope_s amp_env;
+    struct envelope_s * amp_env;
     uint8_t amt;
 } wavetable_t;
 
-extern wavetable_t waveforms[NUM_OSCILLATORS];
+extern wavetable_t oscillators[NUM_OSCILLATORS];
 extern short * osc_wave_tables[NUM_OSC_TYPES];
 
 void wavetable_init(void);

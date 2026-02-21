@@ -1,6 +1,7 @@
 #include "wavetable.h"
 
 #include "audio_engine.h"
+#include "envelope.h"
 #include "gui.h"
 #include "init.h"
 
@@ -55,8 +56,8 @@ short * osc_wave_tables[NUM_OSC_TYPES] =
     ramp_tbl
 };
 
-/// Storage location for waveforms/voice components.
-wavetable_t waveforms[NUM_OSCILLATORS];
+/// Storage location for oscillators/voice components.
+wavetable_t oscillators[NUM_OSCILLATORS];
 
 
 /// Initialize wavetable components.
@@ -67,18 +68,13 @@ void wavetable_init(void)
     wavetable_generate_all();
     wavetable_generate_midi_freq_tbl();
 
-    for (uint8_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
-    {
-        wavetable_t * wav = &waveforms[wav_idx];
-        wav->osc = NONE;
-        wav->amp_env.attack = 0;
-        wav->amp_env.decay = 0;
-        wav->amp_env.sustain_level = UINT32_MAX / 2;
-        wav->amp_env.release = 0;
-        wav->amt = 0;
-    }
-    waveforms[0].osc = SINE;
-    waveforms[0].amt = 127;
+    oscillators[0].osc = SINE;
+    oscillators[0].amt = 127;
+    oscillators[0].amp_env = &envelopes[0];
+
+    oscillators[1].osc = NONE;
+    oscillators[1].amt = 0;
+    oscillators[1].amp_env = &envelopes[1];
 }
 
 /// Genarates all oscillator lookup tables and RMS normalizes them to the same

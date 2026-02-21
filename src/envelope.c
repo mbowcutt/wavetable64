@@ -4,6 +4,7 @@
 #include "audio_engine.h"
 
 uint64_t env_sample_lut[MIDI_MAX_NRPN_VAL + 1] = {0};
+struct envelope_s envelopes[NUM_ENVELOPES];
 
 static void init_env_sample_lut(float t_min, float t_max);
 
@@ -13,6 +14,14 @@ static void init_env_sample_lut(float t_min, float t_max)
     {
         float seconds = t_min * powf(t_max / t_min, (float)idx / (float)MIDI_MAX_NRPN_VAL);
         env_sample_lut[idx] = (uint64_t)(seconds * SAMPLE_RATE);
+    }
+
+    for (size_t env_idx = 0; env_idx < NUM_ENVELOPES; ++env_idx)
+    {
+        envelopes[env_idx].attack = 0;
+        envelopes[env_idx].decay = 0;
+        envelopes[env_idx].sustain_level = UINT32_MAX / 2;
+        envelopes[env_idx].release = 0;
     }
 }
 
