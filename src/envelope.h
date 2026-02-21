@@ -1,6 +1,9 @@
 #ifndef ENVELOPE_H
 #define ENVELOPE_H
 
+#include <midi.h>
+#include <stdint.h>
+
 /// Enum representing each envelope stage.
 enum envelope_stage_e {
     IDLE,
@@ -22,5 +25,74 @@ struct envelope_s
     uint32_t sustain_level;
     uint16_t release;
 };
+
+struct envelope_state_s
+{
+    enum envelope_stage_e stage;
+    uint32_t level;
+    uint64_t rate;
+};
+
+extern uint64_t env_sample_lut[MIDI_MAX_NRPN_VAL + 1];
+
+void envelope_init(void);
+
+static inline void envelope_tick(struct envelope_state_s * env_state, struct envelope_s * env, size_t ticks)
+{
+    switch (env_state->stage)
+    {
+        case IDLE:
+            break;
+        case ATTACK:
+            if (UINT32_MAX > env_state->level)
+            {
+                if ((UINT32_MAX - env_state->level) <= (ticks * env_state->rate))
+                {
+                    env_state->level = UINT32_MAX;
+                    env_state->stage = DECAY;
+                    env_state->rate = (UINT32_MAX - env->sustain_level) / env_sample_lut[env->decay];
+                }
+                else
+                {
+                    env_state->level += (ticks * env_state->rate);
+                }
+            }
+            break;
+        case DECAY:
+            if (env->sustain_level < env_state->level)
+            {
+                if ((env_state->level - env->sustain_level)
+                    <= (ticks * env_state->rate))
+                {
+                    env_state->level = env->sustain_level;
+                    env_state->stage = SUSTAIN;
+                }
+                else
+                {
+                    env_state->level -= (ticks * env_state->rate);
+                }
+            }
+            break;
+        case SUSTAIN:
+            break;
+        case RELEASE:
+            if (0 < env_state->level)
+            {
+                if ((env_state->level) <= (ticks * env_state->rate))
+                {
+                    env_state->level = 0;
+                    env_state->stage = IDLE;
+                }
+                else
+                {
+                    env_state->level -= (ticks * env_state->rate);
+                }
+            }
+            break;
+        case NUM_ENVELOPE_STAGES:
+        default:
+            break;
+    }
+}
 
 #endif

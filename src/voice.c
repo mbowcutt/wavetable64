@@ -6,7 +6,6 @@
 #include <n64sys.h>
 #include <midi.h>
 
-#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -14,9 +13,7 @@ voice_t voices[POLYPHONY_COUNT];
 
 struct envelope_s amp_env;
 
-uint64_t env_sample_lut[MIDI_MAX_NRPN_VAL + 1] = {0};
 
-static void init_env_sample_lut(float t_min, float t_max);
 
 void voice_init(void)
 {
@@ -30,23 +27,14 @@ void voice_init(void)
 
         for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
         {
-            voice->amp_env_state[wav_idx] = IDLE;
-            voice->amp_level[wav_idx] = 0u;
-            voice->amp_env_rate[wav_idx] = 0u;
+            voice->amp_env_state[wav_idx].stage = IDLE;
+            voice->amp_env_state[wav_idx].level = 0u;
+            voice->amp_env_state[wav_idx].rate = 0u;
         }
     }
-
-    init_env_sample_lut(0.001f, 10.0f);
 }
 
-static void init_env_sample_lut(float t_min, float t_max)
-{
-    for (size_t idx = 0; idx <= MIDI_MAX_NRPN_VAL; ++idx)
-    {
-        float seconds = t_min * powf(t_max / t_min, (float)idx / (float)MIDI_MAX_NRPN_VAL);
-        env_sample_lut[idx] = (uint64_t)(seconds * SAMPLE_RATE);
-    }
-}
+
 
 voice_t * voice_find_next(void)
 {
@@ -65,7 +53,7 @@ voice_t * voice_find_next(void)
         for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
         {
             if ((NONE != waveforms[wav_idx].osc)
-                && (IDLE != voices[voice_idx].amp_env_state[wav_idx]))
+                && (IDLE != voices[voice_idx].amp_env_state[wav_idx].stage))
             {
                 break;
             }
@@ -102,8 +90,8 @@ voice_t * voice_find_for_note_off(uint8_t note)
             for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
             {
                 if ((NONE != waveforms[wav_idx].osc)
-                    && (IDLE != voices[voice_idx].amp_env_state[wav_idx])
-                    && (RELEASE != voices[voice_idx].amp_env_state[wav_idx]))
+                    && (IDLE != voices[voice_idx].amp_env_state[wav_idx].stage)
+                    && (RELEASE != voices[voice_idx].amp_env_state[wav_idx].stage))
                 {
                     voice = &voices[voice_idx];
                     break;
@@ -143,9 +131,9 @@ void voice_note_on(voice_t * voice, uint8_t note)
     {
         if (NONE != waveforms[wav_idx].osc)
         {
-            voice->amp_env_state[wav_idx] = ATTACK;
-            voice->amp_env_rate[wav_idx]
-                = (UINT32_MAX - voice->amp_level[wav_idx])
+            voice->amp_env_state[wav_idx].stage = ATTACK;
+            voice->amp_env_state[wav_idx].rate
+                = (UINT32_MAX - voice->amp_env_state[wav_idx].level)
                     / env_sample_lut[waveforms[wav_idx].amp_env.attack];
         }
     }
@@ -158,10 +146,10 @@ void voice_note_off(voice_t * voice)
     {
         if (NONE != waveforms[wav_idx].osc)
         {
-            if (IDLE != voice->amp_env_state[wav_idx])
+            if (IDLE != voice->amp_env_state[wav_idx].stage)
             {
-                voice->amp_env_state[wav_idx] = RELEASE;
-                voice->amp_env_rate[wav_idx] = (voice->amp_level[wav_idx] - 0) / env_sample_lut[waveforms[wav_idx].amp_env.release];
+                voice->amp_env_state[wav_idx].stage = RELEASE;
+                voice->amp_env_state[wav_idx].rate = (voice->amp_env_state[wav_idx].level - 0) / env_sample_lut[waveforms[wav_idx].amp_env.release];
             }
         }
     }

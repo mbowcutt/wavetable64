@@ -11,6 +11,7 @@ int main(void)
 {
     gui_init();
     input_init();
+    envelope_init();
     wavetable_init();
     voice_init();
     audio_engine_init();

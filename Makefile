@@ -3,6 +3,7 @@ include $(N64_INST)/include/n64.mk
 
 OBJS = $(BUILD_DIR)/src/main.o \
        $(BUILD_DIR)/src/audio_engine.o \
+       $(BUILD_DIR)/src/envelope.o \
        $(BUILD_DIR)/src/gui.o \
        $(BUILD_DIR)/src/input.o \
        $(BUILD_DIR)/src/voice.o \

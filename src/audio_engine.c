@@ -86,14 +86,14 @@ static inline int32_t get_next_sample(void)
         {
             wavetable_t * wav = &waveforms[wav_idx];
 
-            if ((IDLE != voice->amp_env_state[wav_idx])
+            if ((IDLE != voice->amp_env_state[wav_idx].stage)
                 && (NONE != wav->osc)
                 && (wav->amt > 0))
             {
                 short component = wavetable_get_amplitude(voice->phase,
                                                           wavetable_get(wav->osc));
 
-                component = (short)(((int64_t)component * (int64_t)voice->amp_level[wav_idx]) / UINT32_MAX);
+                component = (short)(((int64_t)component * (int64_t)voice->amp_env_state[wav_idx].level) / UINT32_MAX);
                 component = (component * wav->amt) / MIDI_MAX_DATA_BYTE;
 
                 amplitude += component;
@@ -114,10 +114,10 @@ static inline void tick_envelopes(size_t num_ticks)
         voice_t * voice = voice_get(voice_idx);
         for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
         {
-            if ((IDLE != voice->amp_env_state[wav_idx])
+            if ((IDLE != voice->amp_env_state[wav_idx].stage)
                 && (NONE != waveforms[wav_idx].osc))
             {
-                voice_envelope_tick(voice, wav_idx, num_ticks);
+                envelope_tick(&voice->amp_env_state[wav_idx], &waveforms[wav_idx].amp_env, num_ticks);
             }
         }
     }
