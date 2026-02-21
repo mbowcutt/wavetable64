@@ -7,7 +7,7 @@
 
 #include "envelope.h"
 
-#define NUM_WAVETABLES 2
+#define NUM_OSCILLATORS 2
 #define WT_BIT_DEPTH 11 // 2048 table entries
 #define WT_SIZE (1 << WT_BIT_DEPTH)
 #define ACCUMULATOR_BITS 32
@@ -19,9 +19,9 @@ enum oscillator_type_e {
     TRIANGLE,
     SQUARE,
     RAMP,
-    NUM_OSCILLATORS,
+    NUM_OSC_TYPES,
 
-    NONE = NUM_OSCILLATORS
+    NONE = NUM_OSC_TYPES
 };
 
 /// Struct representing a waveform or voice component.
@@ -32,8 +32,8 @@ typedef struct {
     uint8_t amt;
 } wavetable_t;
 
-extern wavetable_t waveforms[NUM_WAVETABLES];
-extern short * osc_wave_tables[NUM_OSCILLATORS];
+extern wavetable_t waveforms[NUM_OSCILLATORS];
+extern short * osc_wave_tables[NUM_OSC_TYPES];
 
 void wavetable_init(void);
 

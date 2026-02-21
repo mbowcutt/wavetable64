@@ -82,7 +82,7 @@ static inline int32_t get_next_sample(void)
     {
         voice_t * voice = voice_get(voice_idx);
 
-        for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+        for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
         {
             wavetable_t * wav = &waveforms[wav_idx];
 
@@ -112,7 +112,7 @@ static inline void tick_envelopes(size_t num_ticks)
     for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
     {
         voice_t * voice = voice_get(voice_idx);
-        for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+        for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
         {
             if ((IDLE != voice->amp_env_state[wav_idx].stage)
                 && (NONE != waveforms[wav_idx].osc))

@@ -47,7 +47,7 @@ static short ramp_tbl[WT_SIZE + 1];
 static float temp_tbl[WT_SIZE];
 
 /// Array of pointers to osillaor lookup tables.
-short * osc_wave_tables[NUM_OSCILLATORS] =
+short * osc_wave_tables[NUM_OSC_TYPES] =
 {
     sine_tbl,
     square_tbl,
@@ -56,7 +56,7 @@ short * osc_wave_tables[NUM_OSCILLATORS] =
 };
 
 /// Storage location for waveforms/voice components.
-wavetable_t waveforms[NUM_WAVETABLES];
+wavetable_t waveforms[NUM_OSCILLATORS];
 
 
 /// Initialize wavetable components.
@@ -67,7 +67,7 @@ void wavetable_init(void)
     wavetable_generate_all();
     wavetable_generate_midi_freq_tbl();
 
-    for (uint8_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+    for (uint8_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
     {
         wavetable_t * wav = &waveforms[wav_idx];
         wav->osc = NONE;

@@ -286,7 +286,7 @@ static void gui_print_main(display_context_t disp)
 
     x_base += (5 * 8);
 
-    for (uint8_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+    for (uint8_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
     {
         int x_loc = x_base;
         int y_loc = y_base;
@@ -496,7 +496,7 @@ void gui_select_right(void)
             }
             else
             {
-                if ((NUM_WAVETABLES - 1) == selected_wav_idx)
+                if ((NUM_OSCILLATORS - 1) == selected_wav_idx)
                 {
                     selected_wav_idx = 0;
                 }
@@ -553,7 +553,7 @@ void gui_select_left(void)
             {
                 if (0 == selected_wav_idx)
                 {
-                    selected_wav_idx = NUM_WAVETABLES - 1;
+                    selected_wav_idx = NUM_OSCILLATORS - 1;
                 }
                 else
                 {

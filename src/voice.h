@@ -16,7 +16,7 @@ typedef struct
     uint8_t note;
     uint32_t phase;
     uint32_t tune;
-    struct envelope_state_s amp_env_state[NUM_WAVETABLES];
+    struct envelope_state_s amp_env_state[NUM_OSCILLATORS];
     uint64_t timestamp;
 } voice_t;
 

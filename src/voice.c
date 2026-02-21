@@ -13,8 +13,6 @@ voice_t voices[POLYPHONY_COUNT];
 
 struct envelope_s amp_env;
 
-
-
 void voice_init(void)
 {
     for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
@@ -25,7 +23,7 @@ void voice_init(void)
         voice->tune = 0u;
         voice->timestamp = 0u;
 
-        for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+        for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
         {
             voice->amp_env_state[wav_idx].stage = IDLE;
             voice->amp_env_state[wav_idx].level = 0u;
@@ -50,7 +48,7 @@ voice_t * voice_find_next(void)
         }
 
         // If any waveform is active & non-IDLE, do not select it.
-        for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+        for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
         {
             if ((NONE != waveforms[wav_idx].osc)
                 && (IDLE != voices[voice_idx].amp_env_state[wav_idx].stage))
@@ -58,7 +56,7 @@ voice_t * voice_find_next(void)
                 break;
             }
 
-            if ((NUM_WAVETABLES - 1) == wav_idx)
+            if ((NUM_OSCILLATORS - 1) == wav_idx)
             {
                 voice = &voices[voice_idx];
             }
@@ -87,7 +85,7 @@ voice_t * voice_find_for_note_off(uint8_t note)
         {
             // If any of the active waveforms are not IDLE or RELEASE,
             // the note is active - select it.
-            for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+            for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
             {
                 if ((NONE != waveforms[wav_idx].osc)
                     && (IDLE != voices[voice_idx].amp_env_state[wav_idx].stage)
@@ -127,7 +125,7 @@ void voice_note_on(voice_t * voice, uint8_t note)
 {
     voice->note = note;
     voice->tune = wavetable_get_tune(note);
-    for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+    for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
     {
         if (NONE != waveforms[wav_idx].osc)
         {
@@ -142,7 +140,7 @@ void voice_note_on(voice_t * voice, uint8_t note)
 
 void voice_note_off(voice_t * voice)
 {
-    for (size_t wav_idx = 0; wav_idx < NUM_WAVETABLES; ++wav_idx)
+    for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
     {
         if (NONE != waveforms[wav_idx].osc)
         {
