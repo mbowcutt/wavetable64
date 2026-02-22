@@ -29,7 +29,7 @@ enum oscillator_type_e {
 typedef struct {
     enum oscillator_type_e osc;
     struct envelope_s * amp_env;
-    uint8_t amt;
+    uint8_t gain;
 } wavetable_t;
 
 extern wavetable_t oscillators[NUM_OSCILLATORS];
@@ -37,7 +37,8 @@ extern short * osc_wave_tables[NUM_OSC_TYPES];
 
 void wavetable_init(void);
 
-uint32_t wavetable_get_tune(uint8_t const note);
+uint32_t wavetable_get_midi_tune(uint8_t const note);
+uint32_t wavetable_get_freq_tune(float freq_hz);
 
 /// Return a pointer to the given wavetable type.
 static inline short * wavetable_get(enum oscillator_type_e osc)

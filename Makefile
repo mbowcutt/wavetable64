@@ -6,6 +6,7 @@ OBJS = $(BUILD_DIR)/src/main.o \
        $(BUILD_DIR)/src/envelope.o \
        $(BUILD_DIR)/src/gui.o \
        $(BUILD_DIR)/src/input.o \
+       $(BUILD_DIR)/src/lfo.o \
        $(BUILD_DIR)/src/voice.o \
        $(BUILD_DIR)/src/wavetable.o
 

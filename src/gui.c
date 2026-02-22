@@ -32,7 +32,7 @@ static void gui_draw_osc_type(display_context_t disp,
 static void gui_draw_amp_env(display_context_t disp,
                              uint8_t wav_idx,
                              int x_base, int y_base);
-static void gui_draw_amt_box(display_context_t disp,
+static void gui_draw_gain_box(display_context_t disp,
                              uint8_t wav_idx,
                              int x_base, int y_base);
 
@@ -282,7 +282,7 @@ static void gui_print_main(display_context_t disp)
 
     rdpq_text_print(NULL, 1, x_base, y_base + 9, "OSC:");
     rdpq_text_print(NULL, 1, x_base, y_base + 140 + 12 - 2, "AMP:");
-    rdpq_text_print(NULL, 1, x_base, y_base + 140 + 12 + 2 + 8, "AMT:");
+    rdpq_text_print(NULL, 1, x_base, y_base + 140 + 12 + 2 + 8, "GAIN:");
 
     x_base += (5 * 8);
 
@@ -298,7 +298,7 @@ static void gui_print_main(display_context_t disp)
 
         y_loc += 140 + 2;
 
-        gui_draw_amt_box(disp, wav_idx, x_loc, y_loc);
+        gui_draw_gain_box(disp, wav_idx, x_loc, y_loc);
 
         x_base += (62 + 4);
     }
@@ -410,7 +410,7 @@ static void gui_draw_amp_env(display_context_t disp,
     rdpq_fill_rectangle(x_base, r_pos, x_base + 6, r_pos + r_height);
 }
 
-static void gui_draw_amt_box(display_context_t disp,
+static void gui_draw_gain_box(display_context_t disp,
                              uint8_t wav_idx,
                              int x_base, int y_base)
 {
@@ -433,9 +433,9 @@ static void gui_draw_amt_box(display_context_t disp,
     }
     rdpq_fill_rectangle(x_base, y_base, x_base + box_width, y_base + 10);
 
-    int amt_width = ((box_width - 4) * oscillators[wav_idx].amt) / MIDI_MAX_DATA_BYTE;
+    int gain_width = ((box_width - 4) * oscillators[wav_idx].gain) / MIDI_MAX_DATA_BYTE;
     rdpq_set_fill_color(color_white);
-    rdpq_fill_rectangle(x_base + 2, y_base + 2, x_base + amt_width, y_base + 8);
+    rdpq_fill_rectangle(x_base + 2, y_base + 2, x_base + gain_width, y_base + 8);
 }
 
 static char * get_osc_type_str(enum oscillator_type_e osc_type)
@@ -486,9 +486,9 @@ void gui_select_right(void)
                             ++selected_subfield;
                         }
                         break;
-                    case 2: // amt
-                        if (MIDI_MAX_DATA_BYTE > oscillators[selected_wav_idx].amt)
-                            ++oscillators[selected_wav_idx].amt;
+                    case 2: // gain
+                        if (MIDI_MAX_DATA_BYTE > oscillators[selected_wav_idx].gain)
+                            ++oscillators[selected_wav_idx].gain;
                         break;
                     default:
                         break;
@@ -541,9 +541,9 @@ void gui_select_left(void)
                             --selected_subfield;
                         }
                         break;
-                    case 2: // amt
-                        if (0 < oscillators[selected_wav_idx].amt)
-                            --oscillators[selected_wav_idx].amt;
+                    case 2: // gain
+                        if (0 < oscillators[selected_wav_idx].gain)
+                            --oscillators[selected_wav_idx].gain;
                         break;
                     default:
                         break;
@@ -612,7 +612,7 @@ void gui_select_up(void)
                                 break;
                         }
                         break;
-                    case 2: // amt
+                    case 2: // gain
                         break;
                     default:
                         break;
@@ -678,7 +678,7 @@ void gui_select_down(void)
                                 break;
                         }
                         break;
-                    case 2: // amt
+                    case 2: // gain
                         break;
                     default:
                         break;

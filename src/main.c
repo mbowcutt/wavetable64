@@ -4,6 +4,7 @@
 #include "init.h"
 #include "input.h"
 #include "gui.h"
+#include "lfo.h"
 #include "wavetable.h"
 #include "voice.h"
 
@@ -12,6 +13,7 @@ int main(void)
     gui_init();
     input_init();
     envelope_init();
+    lfo_init();
     wavetable_init();
     voice_init();
     audio_engine_init();

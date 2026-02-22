@@ -122,7 +122,7 @@ void voice_envelope_set_release(uint8_t value)
 void voice_note_on(voice_t * voice, uint8_t note)
 {
     voice->note = note;
-    voice->tune = wavetable_get_tune(note);
+    voice->tune = wavetable_get_midi_tune(note);
     for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
     {
         if (NONE != oscillators[wav_idx].osc)

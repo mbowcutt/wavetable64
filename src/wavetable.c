@@ -69,11 +69,11 @@ void wavetable_init(void)
     wavetable_generate_midi_freq_tbl();
 
     oscillators[0].osc = SINE;
-    oscillators[0].amt = 127;
+    oscillators[0].gain = 127;
     oscillators[0].amp_env = &envelopes[0];
 
     oscillators[1].osc = NONE;
-    oscillators[1].amt = 0;
+    oscillators[1].gain = 0;
     oscillators[1].amp_env = &envelopes[1];
 }
 
@@ -209,9 +209,14 @@ static void wavetable_normalize(short * lut, float target_rms, float sum_squares
 /// One pass through every 32 bit value represents one complete cycle. The step
 /// rate is calculated by multiplying the frequency by the total number of
 /// accumulator values (UINT32_MAX + 1), and dividing by the sample rate.
-uint32_t wavetable_get_tune(uint8_t const note)
+uint32_t wavetable_get_midi_tune(uint8_t const note)
 {
-    return (uint32_t)((midi_freq_lut[note] * ((uint64_t)1 << ACCUMULATOR_BITS)) / SAMPLE_RATE);
+    return wavetable_get_freq_tune(midi_freq_lut[note]);
+}
+
+uint32_t wavetable_get_freq_tune(float freq_hz)
+{
+    return (uint32_t)((freq_hz * ((uint64_t)1 << ACCUMULATOR_BITS)) / SAMPLE_RATE);
 }
 
 
