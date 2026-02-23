@@ -40,6 +40,10 @@ void wavetable_init(void);
 uint32_t wavetable_get_midi_tune(uint8_t const note);
 uint32_t wavetable_get_freq_tune(float freq_hz);
 
+short wavetable_triangle_component(uint32_t const phase);
+short wavetable_square_component(uint32_t const phase);
+short wavetable_ramp_component(uint32_t const phase);
+
 /// Return a pointer to the given wavetable type.
 static inline short * wavetable_get(enum oscillator_type_e osc)
 {

@@ -2,6 +2,7 @@
 
 #include "gui.h"
 #include "init.h"
+#include "lfo.h"
 #include "voice.h"
 #include "wavetable.h"
 
@@ -51,6 +52,8 @@ void audio_engine_synthesize(short * buffer, size_t num_samples)
             int32_t sample = get_next_sample();
 
             tick_envelopes(1);
+
+            lfo_tick_all(1);
 
             if ((sample > 0) && (sample > peak))
             {
@@ -104,7 +107,9 @@ static inline int32_t get_next_sample(void)
         voice->phase += voice->tune;
     }
 
-    return (amplitude * mix_gain_factor / MIDI_MAX_DATA_BYTE);
+    int16_t gain = lfo_mod_gain(mix_gain_factor);
+
+    return (amplitude * gain / MIDI_MAX_DATA_BYTE);
 }
 
 static inline void tick_envelopes(size_t num_ticks)

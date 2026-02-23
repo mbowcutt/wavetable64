@@ -10,7 +10,8 @@ void lfo_init(void)
         lfo->type = NONE;
         lfo->phase_pos = 0u;
         lfo->tune = 0u;
-        lfo->level = 0u;
+        lfo->cur_amplitude = 0;
+        lfo->depth = 0u;
         lfo->dst = 0u;
     }
 }

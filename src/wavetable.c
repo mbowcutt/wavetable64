@@ -220,33 +220,33 @@ uint32_t wavetable_get_freq_tune(float freq_hz)
 }
 
 
-// static short triangle_component(uint32_t const phase)
-// {
-//     uint32_t phase_temp = phase + 0x40000000;
-//     phase_temp >>= 15;
-//     if (phase_temp & 0x10000)
-//     {
-//         phase_temp = 0x1FFFF - phase_temp;
-//     }
-//     return (short)(phase_temp - 0x8000);
-// }
+short wavetable_triangle_component(uint32_t const phase)
+{
+    uint32_t phase_temp = phase + 0x40000000;
+    phase_temp >>= 15;
+    if (phase_temp & 0x10000)
+    {
+        phase_temp = 0x1FFFF - phase_temp;
+    }
+    return (short)(phase_temp - 0x8000);
+}
 
-// static short square_component(uint32_t const phase)
-// {
-//     if (phase & 0x80000000)
-//     {
-//         return INT16_MIN;
-//     }
-//     else
-//     {
-//         return INT16_MAX;
-//     }
-// }
+short wavetable_square_component(uint32_t const phase)
+{
+    if (phase & 0x80000000)
+    {
+        return INT16_MIN;
+    }
+    else
+    {
+        return INT16_MAX;
+    }
+}
 
-// static short ramp_component(uint32_t const phase)
-// {
-//     return (short)((phase) >> 16);
-// }
+short wavetable_ramp_component(uint32_t const phase)
+{
+    return (short)((phase) >> 16);
+}
 
 /// Generate MIDI note to frequency lookup table.
 /// Produces an array midi_freq_lut of type float, where the index is the MIDI
