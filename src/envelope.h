@@ -39,8 +39,14 @@ extern uint64_t env_sample_lut[MIDI_MAX_NRPN_VAL + 1];
 extern struct envelope_s envelopes[NUM_ENVELOPES];
 
 void envelope_init(void);
+void envelope_set_attack(uint8_t idx, uint16_t data);
+void envelope_set_decay(uint8_t idx, uint16_t data);
+void envelope_set_sustain(uint8_t idx, uint32_t data);
+void envelope_set_release(uint8_t idx, uint16_t data);
 
-static inline void envelope_tick(struct envelope_state_s * env_state, struct envelope_s * env, size_t ticks)
+uint64_t envelope_get_trans_samples(uint8_t idx, enum envelope_stage_e stage);
+
+static inline void envelope_tick(struct envelope_state_s * env_state, uint8_t idx, size_t ticks)
 {
     switch (env_state->stage)
     {
@@ -53,7 +59,7 @@ static inline void envelope_tick(struct envelope_state_s * env_state, struct env
                 {
                     env_state->level = UINT32_MAX;
                     env_state->stage = DECAY;
-                    env_state->rate = (UINT32_MAX - env->sustain_level) / env_sample_lut[env->decay];
+                    env_state->rate = (UINT32_MAX - envelopes[idx].sustain_level) / env_sample_lut[envelopes[idx].decay];
                 }
                 else
                 {
@@ -62,12 +68,12 @@ static inline void envelope_tick(struct envelope_state_s * env_state, struct env
             }
             break;
         case DECAY:
-            if (env->sustain_level < env_state->level)
+            if (envelopes[idx].sustain_level < env_state->level)
             {
-                if ((env_state->level - env->sustain_level)
+                if ((env_state->level - envelopes[idx].sustain_level)
                     <= (ticks * env_state->rate))
                 {
-                    env_state->level = env->sustain_level;
+                    env_state->level = envelopes[idx].sustain_level;
                     env_state->stage = SUSTAIN;
                 }
                 else

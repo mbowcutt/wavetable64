@@ -2,6 +2,7 @@
 
 #include "init.h"
 #include "audio_engine.h"
+#include "envelope.h"
 #include "voice.h"
 #include "wavetable.h"
 
@@ -13,7 +14,7 @@
 
 #include <stddef.h>
 
-enum menu_screen
+enum menu_screen_e
 {
     SCREEN_MAIN,
     SCREEN_FILE,
@@ -21,23 +22,78 @@ enum menu_screen
     SCREEN_SETTINGS
 };
 
+enum main_sel_e
+{
+    MAIN_SEL_OSC_1,
+    MAIN_SEL_OSC_2,
+
+    MAIN_SEL_ENV_1,
+    MAIN_SEL_ENV_2,
+    MAIN_SEL_ENV_3,
+
+    MAIN_SEL_LFO_1,
+    MAIN_SEL_LFO_2,
+};
+
+enum main_osc_subsel_e
+{
+    MAIN_OSC_SUBSEL_SHAPE,
+    MAIN_OSC_SUBSEL_AMP_ENV,
+    MAIN_OSC_SUBSEL_GAIN,
+};
+
+enum main_env_subsel_e
+{
+    MAIN_ENV_SUBSEL_A,
+    MAIN_ENV_SUBSEL_D,
+    MAIN_ENV_SUBSEL_S,
+    MAIN_ENV_SUBSEL_R,
+};
+
+enum main_lfo_subsel_e
+{
+    MAIN_LFO_SUBSEL_SHAPE,
+    MAIN_LFO_SUBSEL_RATE,
+    MAIN_LFO_SUBSEL_DEPTH,
+    MAIN_LFO_SUBSEL_DST,
+};
+
+static struct {
+    enum menu_screen_e screen;
+    enum main_sel_e sel;
+    bool selected;
+    union
+    {
+        enum main_osc_subsel_e osc;
+        enum main_env_subsel_e env;
+        enum main_lfo_subsel_e lfo;
+    } subsel;
+} gui_state =
+{
+    .screen = SCREEN_MAIN,
+    .sel = MAIN_SEL_OSC_1,
+    .selected = false,
+    .subsel.osc = MAIN_OSC_SUBSEL_SHAPE,
+};
+
 static void gui_print_header(display_context_t disp);
 static void gui_print_footer(display_context_t disp);
 static void gui_print_menu(display_context_t disp);
 static void gui_print_main(display_context_t disp);
 
-static void gui_draw_osc_type(display_context_t disp,
-                              uint8_t wav_idx,
-                              int x_base, int y_base);
-static void gui_draw_amp_env(display_context_t disp,
-                             uint8_t wav_idx,
-                             int x_base, int y_base);
-static void gui_draw_gain_box(display_context_t disp,
-                             uint8_t wav_idx,
-                             int x_base, int y_base);
+static void gui_draw_osc(uint8_t osc_idx, int x_base, int y_base);
 
-static char * get_osc_type_str(enum oscillator_type_e osc_type);
+static char * get_osc_shape_str(enum oscillator_shape_e osc_shape);
 
+static void gui_main_nav_right(void);
+static void gui_main_nav_left(void);
+static void gui_main_nav_up(void);
+static void gui_main_nav_down(void);
+
+static void gui_osc_nav_left(void);
+static void gui_osc_nav_right(void);
+static void gui_osc_nav_up(void);
+static void gui_osc_nav_down(void);
 
 static color_t color_red = RGBA32(0xFF, 0, 0, 0xFF);
 static color_t color_green = RGBA32(0, 0xFF, 0, 0xFF);
@@ -46,12 +102,6 @@ static color_t color_yellow = RGBA32(0xFF, 0xFF, 0, 0xFF);
 static color_t color_white = RGBA32(0xFF, 0xFF, 0xFF, 0xFF);
 static color_t color_black = RGBA32(0, 0, 0, 0xFF);
 static color_t color_gray = RGBA32(0x44, 0x44, 0x44, 0xFF);
-
-enum menu_screen current_screen = SCREEN_MAIN;
-uint8_t selected_wav_idx = 0;
-uint8_t selected_field_main = 0;
-uint8_t selected_subfield = 0;
-bool field_selected = false;
 
 static rdpq_font_t * font;
 
@@ -78,7 +128,7 @@ void gui_draw_screen(void)
     gui_print_footer(disp);
     gui_print_menu(disp);
 
-    switch (current_screen)
+    switch (gui_state.screen)
     {
         case SCREEN_MAIN:
             gui_print_main(disp);
@@ -197,7 +247,7 @@ static void gui_print_menu(display_context_t disp)
     // graphics_draw_line(disp, 0, 30, 512, 30, graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF));
 
     rdpq_set_fill_color(color_red);
-    switch (current_screen)
+    switch (gui_state.screen)
     {
         case SCREEN_MAIN:
             rdpq_fill_rectangle(108, 19, 140, 30);
@@ -280,92 +330,17 @@ static void gui_print_main(display_context_t disp)
     int x_base = 26;
     int y_base = 34;
 
-    rdpq_text_print(NULL, 1, x_base, y_base + 9, "OSC:");
-    rdpq_text_print(NULL, 1, x_base, y_base + 140 + 12 - 2, "AMP:");
-    rdpq_text_print(NULL, 1, x_base, y_base + 140 + 12 + 2 + 8, "GAIN:");
-
-    x_base += (5 * 8);
-
-    for (uint8_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
+    for (uint8_t osc_idx = 0; osc_idx < NUM_OSCILLATORS; ++osc_idx)
     {
-        int x_loc = x_base;
-        int y_loc = y_base;
-        gui_draw_osc_type(disp, wav_idx, x_loc, y_loc);
-
-        y_loc += 10 + 2;
-
-        gui_draw_amp_env(disp, wav_idx, x_loc, y_loc);
-
-        y_loc += 140 + 2;
-
-        gui_draw_gain_box(disp, wav_idx, x_loc, y_loc);
-
-        x_base += (62 + 4);
+        gui_draw_osc(osc_idx, x_base, y_base);
+        x_base += 100 + 8;
     }
 }
 
-void gui_screen_next(void)
+static void gui_draw_osc(uint8_t osc_idx, int x_base, int y_base)
 {
-    if (SCREEN_SETTINGS == current_screen)
-    {
-        current_screen = SCREEN_MAIN;
-    }
-    else
-    {
-        ++current_screen;
-    }
-    field_selected = false;
-}
-
-void gui_screen_prev(void)
-{
-    if (SCREEN_MAIN == current_screen)
-    {
-        current_screen = SCREEN_SETTINGS;
-    }
-    else
-    {
-        --current_screen;
-    }
-    field_selected = false;
-}
-
-static void gui_draw_osc_type(display_context_t disp,
-                              uint8_t wav_idx,
-                              int x_base, int y_base)
-{
-    enum oscillator_type_e const osc_type = oscillators[wav_idx].osc;
-    int const box_width = 62;
-
-    if ((0 == selected_field_main) && (wav_idx == selected_wav_idx))
-    {
-        if (field_selected)
-        {
-            rdpq_set_mode_fill(color_green);
-        }
-        else
-        {
-            rdpq_set_mode_fill(color_blue);
-        }
-    }
-    else
-    {
-        rdpq_set_mode_fill(color_gray);
-    }
-
-    rdpq_fill_rectangle(x_base, y_base, x_base + box_width, y_base + 10);
-    rdpq_text_printf(NULL, 1, x_base + 4, y_base + 9, "%s", get_osc_type_str(osc_type));
-}
-
-static void gui_draw_amp_env(display_context_t disp,
-                             uint8_t wav_idx,
-                             int x_base, int y_base)
-{
-    struct envelope_s * env = oscillators[wav_idx].amp_env;
-    int const box_width = 62;
-    int const env_box_height = 140;
-
-    if ((1 == selected_field_main) && (wav_idx == selected_wav_idx))
+    if (((0 == osc_idx) && (MAIN_SEL_OSC_1 == gui_state.sel))
+        || ((1 == osc_idx) && (MAIN_SEL_OSC_2 == gui_state.sel)))
     {
         rdpq_set_mode_fill(color_blue);
     }
@@ -373,74 +348,72 @@ static void gui_draw_amp_env(display_context_t disp,
     {
         rdpq_set_mode_fill(color_gray);
     }
-    rdpq_fill_rectangle(x_base, y_base, x_base + box_width, y_base + env_box_height);
+    rdpq_fill_rectangle(x_base - 4, y_base, x_base + 100, y_base + 62);
 
-    x_base += 4;
-
-    if ((1 == selected_field_main)
-        && (wav_idx == selected_wav_idx)
-        && field_selected)
+    if (gui_state.selected &&
+        (((0 == osc_idx) && (MAIN_SEL_OSC_1 == gui_state.sel))
+        || ((1 == osc_idx) && (MAIN_SEL_OSC_2 == gui_state.sel))))
     {
-        rdpq_set_mode_fill(color_green);
-        int x_loc = x_base + 6 + ((2 * selected_subfield) * 6);
-        rdpq_fill_rectangle(x_loc - 3, y_base + env_box_height - 12, x_loc + 8, y_base + env_box_height);
+        rdpq_set_fill_color(color_green);
+        switch (gui_state.subsel.osc)
+        {
+            case MAIN_OSC_SUBSEL_SHAPE:
+                rdpq_fill_rectangle(x_base - 2, y_base + 1, x_base + 98, y_base + 12);
+                break;
+            case MAIN_OSC_SUBSEL_AMP_ENV:
+                rdpq_fill_rectangle(x_base - 2, y_base + 40, x_base + 98, y_base + 51);
+                break;
+            case MAIN_OSC_SUBSEL_GAIN:
+                rdpq_fill_rectangle(x_base - 2, y_base + 50, x_base + 98, y_base + 61);
+                break;
+        }
     }
-    rdpq_text_printf(NULL, 1, x_base, y_base + env_box_height - 2, " A D S R ");
-    x_base += 6;
 
-    rdpq_set_mode_fill(color_white);
+    // TODO: Draw osc waveform
+    rdpq_set_fill_color(color_black);
+    rdpq_fill_rectangle(x_base + 4, y_base + 12, x_base + 92, y_base + 40);
 
-    int a_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env->attack) / (uint64_t)MIDI_MAX_NRPN_VAL);
-    int a_pos = y_base + (env_box_height - 10) - a_height;
-    rdpq_fill_rectangle(x_base, a_pos, x_base + 6, a_pos + a_height);
-    x_base += (2 * 6);
+    wavetable_t * osc = &oscillators[osc_idx];
+    int gain_width = (62 * osc->gain) / MIDI_MAX_DATA_BYTE;
+    rdpq_set_fill_color(color_white);
+    rdpq_fill_rectangle(x_base + 32, y_base + 52, x_base + 32 + gain_width, y_base + 59);
 
-    int d_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env->decay) / (uint64_t)MIDI_MAX_NRPN_VAL);
-    int d_pos = y_base + (env_box_height - 10) - d_height;
-    rdpq_fill_rectangle(x_base, d_pos, x_base + 6, d_pos + d_height);
-    x_base += (2 * 6);
-
-    int s_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env->sustain_level) / (uint64_t)UINT32_MAX);
-    int s_pos = y_base + (env_box_height - 10) - s_height;
-    rdpq_fill_rectangle(x_base, s_pos, x_base + 6, s_pos + s_height);
-    x_base += (2 * 6);
-
-    int r_height = ((MIDI_MAX_DATA_BYTE * (uint64_t)env->release) / (uint64_t)MIDI_MAX_NRPN_VAL);
-    int r_pos = y_base + (env_box_height - 10) - r_height;
-    rdpq_fill_rectangle(x_base, r_pos, x_base + 6, r_pos + r_height);
+    rdpq_text_printf(NULL, 1, x_base, y_base + 10,  "OSC %d: %s",
+                     osc_idx + 1, get_osc_shape_str(osc->shape));
+    rdpq_text_printf(NULL, 1, x_base, y_base + 49, "AMP ENV: ENV %d",
+                     osc->amp_env_idx + 1);
+    rdpq_text_print(NULL, 1, x_base, y_base + 59, "GAIN:");
 }
 
-static void gui_draw_gain_box(display_context_t disp,
-                             uint8_t wav_idx,
-                             int x_base, int y_base)
+void gui_screen_next(void)
 {
-    int const box_width = 62;
-
-    if ((2 == selected_field_main) && (wav_idx == selected_wav_idx))
+    if (SCREEN_SETTINGS == gui_state.screen)
     {
-        if (field_selected)
-        {
-            rdpq_set_mode_fill(color_green);
-        }
-        else
-        {
-            rdpq_set_mode_fill(color_blue);
-        }
+        gui_state.screen = SCREEN_MAIN;
     }
     else
     {
-        rdpq_set_mode_fill(color_gray);
+        ++gui_state.screen;
     }
-    rdpq_fill_rectangle(x_base, y_base, x_base + box_width, y_base + 10);
-
-    int gain_width = ((box_width - 4) * oscillators[wav_idx].gain) / MIDI_MAX_DATA_BYTE;
-    rdpq_set_fill_color(color_white);
-    rdpq_fill_rectangle(x_base + 2, y_base + 2, x_base + gain_width, y_base + 8);
+    gui_state.selected = false;
 }
 
-static char * get_osc_type_str(enum oscillator_type_e osc_type)
+void gui_screen_prev(void)
 {
-    switch (osc_type)
+    if (SCREEN_MAIN == gui_state.screen)
+    {
+        gui_state.screen = SCREEN_SETTINGS;
+    }
+    else
+    {
+        --gui_state.screen;
+    }
+    gui_state.selected = false;
+}
+
+static char * get_osc_shape_str(enum oscillator_shape_e osc_shape)
+{
+    switch (osc_shape)
     {
         case SINE:
             return "SINE";
@@ -457,54 +430,12 @@ static char * get_osc_type_str(enum oscillator_type_e osc_type)
     }
 }
 
-void gui_select_right(void)
+void gui_nav_right(void)
 {
-    switch (current_screen)
+    switch (gui_state.screen)
     {
         case SCREEN_MAIN:
-            if (field_selected)
-            {
-                switch (selected_field_main)
-                {
-                    case 0: // oscillator
-                        if (NONE == oscillators[selected_wav_idx].osc)
-                        {
-                            oscillators[selected_wav_idx].osc = SINE;
-                        }
-                        else
-                        {
-                            ++oscillators[selected_wav_idx].osc;
-                        }
-                        break;
-                    case 1: // amp env
-                        if (3 == selected_subfield)
-                        {
-                            selected_subfield = 0;
-                        }
-                        else
-                        {
-                            ++selected_subfield;
-                        }
-                        break;
-                    case 2: // gain
-                        if (MIDI_MAX_DATA_BYTE > oscillators[selected_wav_idx].gain)
-                            ++oscillators[selected_wav_idx].gain;
-                        break;
-                    default:
-                        break;
-                }
-            }
-            else
-            {
-                if ((NUM_OSCILLATORS - 1) == selected_wav_idx)
-                {
-                    selected_wav_idx = 0;
-                }
-                else
-                {
-                    ++selected_wav_idx;
-                }
-            }
+            gui_main_nav_right();
             break;
 
         default:
@@ -512,54 +443,12 @@ void gui_select_right(void)
     }
 }
 
-void gui_select_left(void)
+void gui_nav_left(void)
 {
-    switch (current_screen)
+    switch (gui_state.screen)
     {
         case SCREEN_MAIN:
-            if (field_selected)
-            {
-                switch (selected_field_main)
-                {
-                    case 0: // oscillator
-                        if (SINE == oscillators[selected_wav_idx].osc)
-                        {
-                            oscillators[selected_wav_idx].osc = NONE;
-                        }
-                        else
-                        {
-                            --oscillators[selected_wav_idx].osc;
-                        }
-                        break;
-                    case 1: // amp env
-                        if (0 == selected_subfield)
-                        {
-                            selected_subfield = 3;
-                        }
-                        else
-                        {
-                            --selected_subfield;
-                        }
-                        break;
-                    case 2: // gain
-                        if (0 < oscillators[selected_wav_idx].gain)
-                            --oscillators[selected_wav_idx].gain;
-                        break;
-                    default:
-                        break;
-                }
-            }
-            else
-            {
-                if (0 == selected_wav_idx)
-                {
-                    selected_wav_idx = NUM_OSCILLATORS - 1;
-                }
-                else
-                {
-                    --selected_wav_idx;
-                }
-            }
+            gui_main_nav_left();
             break;
 
         default:
@@ -570,65 +459,12 @@ void gui_select_left(void)
 #define ENV_RATE_GRANULE (MIDI_MAX_NRPN_VAL / MIDI_MAX_DATA_BYTE)
 #define SUSTAIN_GRANULE (UINT32_MAX/ MIDI_MAX_DATA_BYTE)
 
-void gui_select_up(void)
+void gui_nav_up(void)
 {
-    switch (current_screen)
+    switch (gui_state.screen)
     {
         case SCREEN_MAIN:
-            if (field_selected)
-            {
-                switch (selected_field_main)
-                {
-                    case 0: // oscillator
-                        break;
-                    case 1: // amp env
-                        switch (selected_subfield)
-                        {
-                            case 0: // attack
-                                if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= oscillators[selected_wav_idx].amp_env->attack)
-                                    oscillators[selected_wav_idx].amp_env->attack += ENV_RATE_GRANULE;
-                                else if (MIDI_MAX_NRPN_VAL > oscillators[selected_wav_idx].amp_env->attack)
-                                    oscillators[selected_wav_idx].amp_env->attack = MIDI_MAX_NRPN_VAL;
-                                break;
-                            case 1: // decay
-                                if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= oscillators[selected_wav_idx].amp_env->sustain_level)
-                                    oscillators[selected_wav_idx].amp_env->decay += ENV_RATE_GRANULE;
-                                else if (MIDI_MAX_NRPN_VAL > oscillators[selected_wav_idx].amp_env->decay)
-                                    oscillators[selected_wav_idx].amp_env->decay = MIDI_MAX_NRPN_VAL;
-                                break;
-                            case 2: // sustain
-                                if ((UINT32_MAX - SUSTAIN_GRANULE) >= oscillators[selected_wav_idx].amp_env->sustain_level)
-                                    oscillators[selected_wav_idx].amp_env->sustain_level += SUSTAIN_GRANULE;
-                                else if (UINT32_MAX > oscillators[selected_wav_idx].amp_env->sustain_level)
-                                    oscillators[selected_wav_idx].amp_env->sustain_level = UINT32_MAX;
-                                break;
-                            case 3: // release
-                                if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= oscillators[selected_wav_idx].amp_env->release)
-                                    oscillators[selected_wav_idx].amp_env->release += ENV_RATE_GRANULE;
-                                else if (MIDI_MAX_NRPN_VAL > oscillators[selected_wav_idx].amp_env->release)
-                                    oscillators[selected_wav_idx].amp_env->release = MIDI_MAX_NRPN_VAL;
-                                break;
-                            default:
-                                break;
-                        }
-                        break;
-                    case 2: // gain
-                        break;
-                    default:
-                        break;
-                }
-            }
-            else
-            {
-                if (0 == selected_field_main)
-                {
-                    selected_field_main = 2;
-                }
-                else
-                {
-                    --selected_field_main;
-                }
-            }
+            gui_main_nav_up();
             break;
 
         default:
@@ -636,77 +472,227 @@ void gui_select_up(void)
     }
 }
 
-void gui_select_down(void)
+void gui_nav_down(void)
 {
-    switch (current_screen)
+    switch (gui_state.screen)
     {
         case SCREEN_MAIN:
-            if (field_selected)
-            {
-                switch (selected_field_main)
-                {
-                    case 0: // oscillator
-                        break;
-                    case 1: // amp env
-                        switch (selected_subfield)
-                        {
-                            case 0: // attack
-                                if (ENV_RATE_GRANULE <= oscillators[selected_wav_idx].amp_env->attack)
-                                    oscillators[selected_wav_idx].amp_env->attack -= ENV_RATE_GRANULE;
-                                else if (0 < oscillators[selected_wav_idx].amp_env->attack)
-                                    oscillators[selected_wav_idx].amp_env->attack = 0;
-                                break;
-                            case 1: // decay
-                                if (ENV_RATE_GRANULE <= oscillators[selected_wav_idx].amp_env->decay)
-                                    oscillators[selected_wav_idx].amp_env->decay -= ENV_RATE_GRANULE;
-                                else if (0 < oscillators[selected_wav_idx].amp_env->decay)
-                                    oscillators[selected_wav_idx].amp_env->decay = 0;
-                                break;
-                            case 2: // sustain
-                                if (SUSTAIN_GRANULE <= oscillators[selected_wav_idx].amp_env->sustain_level)
-                                    oscillators[selected_wav_idx].amp_env->sustain_level -= SUSTAIN_GRANULE;
-                                else if (0 < oscillators[selected_wav_idx].amp_env->sustain_level)
-                                    oscillators[selected_wav_idx].amp_env->sustain_level = 0;
-                                break;
-                            case 3: // release
-                                if (ENV_RATE_GRANULE <= oscillators[selected_wav_idx].amp_env->release)
-                                    oscillators[selected_wav_idx].amp_env->release -= ENV_RATE_GRANULE;
-                                else if (0 < oscillators[selected_wav_idx].amp_env->release)
-                                    oscillators[selected_wav_idx].amp_env->release = 0;
-                                break;
-                            default:
-                                break;
-                        }
-                        break;
-                    case 2: // gain
-                        break;
-                    default:
-                        break;
-                }
-            }
-            else
-            {
-                if (2 == selected_field_main)
-                {
-                    selected_field_main = 0;
-                }
-                else
-                {
-                    ++selected_field_main;
-                }
-            }
+            gui_main_nav_down();
             break;
 
         default:
+            break;
+    }
+}
+
+static void gui_main_nav_right(void)
+{
+    if (gui_state.selected)
+    {
+        switch (gui_state.sel)
+        {
+            case MAIN_SEL_OSC_1:
+            case MAIN_SEL_OSC_2:
+                gui_osc_nav_right();
+                break;
+            default:
+                break;
+        }
+    }
+    else
+    {
+        switch (gui_state.sel)
+        {
+            case MAIN_SEL_OSC_1:
+                gui_state.sel = MAIN_SEL_OSC_2;
+                break;
+            case MAIN_SEL_OSC_2:
+                /// TODO: Navigate to envelopes
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+static void gui_main_nav_left(void)
+{
+    if (gui_state.selected)
+    {
+        switch (gui_state.sel)
+        {
+            case MAIN_SEL_OSC_1:
+            case MAIN_SEL_OSC_2:
+                gui_osc_nav_left();
+                break;
+            default:
+                break;
+        }
+    }
+    else
+    {
+        switch (gui_state.sel)
+        {
+            case MAIN_SEL_OSC_1:
+                /// TODO: Navigate to envelopes
+                break;
+            case MAIN_SEL_OSC_2:
+                gui_state.sel = MAIN_SEL_OSC_1;
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+static void gui_main_nav_up(void)
+{
+    if (gui_state.selected)
+    {
+        switch (gui_state.sel)
+        {
+            case MAIN_SEL_OSC_1:
+            case MAIN_SEL_OSC_2:
+                gui_osc_nav_up();
+                break;
+            default:
+                break;
+        }
+    }
+    else
+    {
+        /// TODO: Navigate
+    }
+}
+
+static void gui_main_nav_down(void)
+{
+    if (gui_state.selected)
+    {
+        switch (gui_state.sel)
+        {
+            case MAIN_SEL_OSC_1:
+            case MAIN_SEL_OSC_2:
+                gui_osc_nav_down();
+                break;
+            default:
+                break;
+        }
+    }
+    else
+    {
+        /// TODO: Navigate
+    }
+}
+
+static void gui_osc_nav_left(void)
+{
+    wavetable_t * osc = &oscillators[gui_state.sel - MAIN_SEL_OSC_1];
+ 
+    switch (gui_state.subsel.osc)
+    {
+        case MAIN_OSC_SUBSEL_SHAPE:
+            if (SINE == osc->shape)
+            {
+                osc->shape = NONE;
+            }
+            else
+            {
+                --osc->shape;
+            }
+            break;
+        case MAIN_OSC_SUBSEL_AMP_ENV:
+            if (0 == osc->amp_env_idx)
+            {
+                osc->amp_env_idx = NUM_ENVELOPES - 1;
+            }
+            else
+            {
+                --osc->amp_env_idx;
+            }
+            break;
+        case MAIN_OSC_SUBSEL_GAIN:
+            if (0 < osc->gain)
+            {
+                --osc->gain;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+static void gui_osc_nav_right(void)
+{
+    wavetable_t * osc = &oscillators[gui_state.sel - MAIN_SEL_OSC_1];
+    switch (gui_state.subsel.osc)
+    {
+        case MAIN_OSC_SUBSEL_SHAPE:
+            if (NONE == osc->shape)
+            {
+                osc->shape = SINE;
+            }
+            else
+            {
+                ++osc->shape;
+            }
+            break;
+        case MAIN_OSC_SUBSEL_AMP_ENV:
+            if ((NUM_ENVELOPES - 1) == osc->amp_env_idx)
+            {
+                osc->amp_env_idx = 0;
+            }
+            else
+            {
+                ++osc->amp_env_idx;
+            }
+            break;
+        case MAIN_OSC_SUBSEL_GAIN:
+            if (MIDI_MAX_DATA_BYTE > osc->gain)
+            {
+                ++osc->gain;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+static void gui_osc_nav_up(void)
+{
+    switch (gui_state.subsel.osc)
+    {
+        case MAIN_OSC_SUBSEL_SHAPE:
+            break;
+        case MAIN_OSC_SUBSEL_AMP_ENV:
+            gui_state.subsel.osc = MAIN_OSC_SUBSEL_SHAPE;
+            break;
+        case MAIN_OSC_SUBSEL_GAIN:
+            gui_state.subsel.osc = MAIN_OSC_SUBSEL_AMP_ENV;
+            break;
+    }
+}
+
+static void gui_osc_nav_down(void)
+{
+    switch (gui_state.subsel.osc)
+    {
+        case MAIN_OSC_SUBSEL_SHAPE:
+            gui_state.subsel.osc = MAIN_OSC_SUBSEL_AMP_ENV;
+            break;
+        case MAIN_OSC_SUBSEL_AMP_ENV:
+            gui_state.subsel.osc = MAIN_OSC_SUBSEL_GAIN;
+            break;
+        case MAIN_OSC_SUBSEL_GAIN:
             break;
     }
 }
 
 void gui_select(void)
 {
-    if (!field_selected)
+    if (!gui_state.selected)
     {
-        field_selected = true;
+        gui_state.selected = true;
     }
     else
     {
@@ -716,6 +702,19 @@ void gui_select(void)
 
 void gui_deselect(void)
 {
-    field_selected = false;
-    selected_subfield = 0;
+    gui_state.selected = false;
+}
+
+bool gui_recv_continuous_input(void)
+{
+    bool ret = false;
+
+    if (gui_state.selected
+        && (((MAIN_SEL_OSC_1 == gui_state.sel)
+             || (MAIN_SEL_OSC_2 == gui_state.sel))
+            && (MAIN_OSC_SUBSEL_GAIN == gui_state.subsel.osc)))
+    {
+        ret = true;
+    }
+    return ret;
 }

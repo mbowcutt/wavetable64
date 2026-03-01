@@ -14,7 +14,7 @@
 #define FRAC_BITS (ACCUMULATOR_BITS - WT_BIT_DEPTH)
 
 /// Enum representing the oscillator waveforms.
-enum oscillator_type_e {
+enum oscillator_shape_e {
     SINE,
     TRIANGLE,
     SQUARE,
@@ -27,8 +27,8 @@ enum oscillator_type_e {
 /// Struct representing a waveform or voice component.
 /// Includes an oscillator type, amp envelope, and mix amount.
 typedef struct {
-    enum oscillator_type_e osc;
-    struct envelope_s * amp_env;
+    enum oscillator_shape_e shape;
+    uint8_t amp_env_idx;
     uint8_t gain;
 } wavetable_t;
 
@@ -45,7 +45,7 @@ short wavetable_square_component(uint32_t const phase);
 short wavetable_ramp_component(uint32_t const phase);
 
 /// Return a pointer to the given wavetable type.
-static inline short * wavetable_get(enum oscillator_type_e osc)
+static inline short * wavetable_get(enum oscillator_shape_e osc)
 {
     return osc_wave_tables[osc];
 }

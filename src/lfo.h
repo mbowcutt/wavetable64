@@ -10,7 +10,7 @@
 #define LFO_DST_FREQ 0x02
 
 typedef struct {
-    enum oscillator_type_e type;
+    enum oscillator_shape_e shape;
     uint32_t phase_pos;
     uint32_t tune;
     short cur_amplitude;
@@ -28,7 +28,7 @@ static inline void lfo_tick(lfo_t * lfo, size_t ticks)
 {
     lfo->phase_pos += (ticks * lfo->tune);
 
-    switch (lfo->type)
+    switch (lfo->shape)
     {
         case SINE:
             lfo->cur_amplitude = wavetable_get_amplitude(lfo->phase_pos, wavetable_get(SINE));
@@ -51,7 +51,7 @@ static inline void lfo_tick_all(size_t num_ticks)
 {
     for (size_t lfo_idx = 0; lfo_idx < NUM_LFOS; ++lfo_idx)
     {
-        if (NONE != lfos[lfo_idx].type)
+        if (NONE != lfos[lfo_idx].shape)
         {
             lfo_tick(&lfos[lfo_idx], 1);
         }

@@ -1,6 +1,7 @@
 #include "voice.h"
 
 #include "audio_engine.h"
+#include "envelope.h"
 #include "wavetable.h"
 
 #include <n64sys.h>
@@ -48,7 +49,7 @@ voice_t * voice_find_next(void)
         // If any waveform is active & non-IDLE, do not select it.
         for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
         {
-            if ((NONE != oscillators[wav_idx].osc)
+            if ((NONE != oscillators[wav_idx].shape)
                 && (IDLE != voices[voice_idx].amp_env_state[wav_idx].stage))
             {
                 break;
@@ -85,7 +86,7 @@ voice_t * voice_find_for_note_off(uint8_t note)
             // the note is active - select it.
             for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
             {
-                if ((NONE != oscillators[wav_idx].osc)
+                if ((NONE != oscillators[wav_idx].shape)
                     && (IDLE != voices[voice_idx].amp_env_state[wav_idx].stage)
                     && (RELEASE != voices[voice_idx].amp_env_state[wav_idx].stage))
                 {
@@ -99,25 +100,6 @@ voice_t * voice_find_for_note_off(uint8_t note)
     return voice;
 }
 
-void voice_envelope_set_attack(uint8_t value)
-{
-    oscillators[0].amp_env->attack = ((uint16_t)value << 7);
-}
-
-void voice_envelope_set_decay(uint8_t value)
-{
-    oscillators[0].amp_env->decay = ((uint16_t)value << 7);
-}
-
-void voice_envelope_set_sustain(uint8_t value)
-{
-    oscillators[0].amp_env->sustain_level = ((((uint64_t)value) << 7) * UINT32_MAX) / MIDI_MAX_NRPN_VAL;
-}
-
-void voice_envelope_set_release(uint8_t value)
-{
-    oscillators[0].amp_env->release = ((uint16_t)value << 7);
-}
 
 void voice_note_on(voice_t * voice, uint8_t note)
 {
@@ -125,12 +107,12 @@ void voice_note_on(voice_t * voice, uint8_t note)
     voice->tune = wavetable_get_midi_tune(note);
     for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
     {
-        if (NONE != oscillators[wav_idx].osc)
+        if (NONE != oscillators[wav_idx].shape)
         {
             voice->amp_env_state[wav_idx].stage = ATTACK;
             voice->amp_env_state[wav_idx].rate
                 = (UINT32_MAX - voice->amp_env_state[wav_idx].level)
-                    / env_sample_lut[oscillators[wav_idx].amp_env->attack];
+                    / envelope_get_trans_samples(oscillators[wav_idx].amp_env_idx, ATTACK);
         }
     }
     voice->timestamp = get_ticks();
@@ -140,12 +122,12 @@ void voice_note_off(voice_t * voice)
 {
     for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
     {
-        if (NONE != oscillators[wav_idx].osc)
+        if (NONE != oscillators[wav_idx].shape)
         {
             if (IDLE != voice->amp_env_state[wav_idx].stage)
             {
                 voice->amp_env_state[wav_idx].stage = RELEASE;
-                voice->amp_env_state[wav_idx].rate = (voice->amp_env_state[wav_idx].level - 0) / env_sample_lut[oscillators[wav_idx].amp_env->release];
+                voice->amp_env_state[wav_idx].rate = (voice->amp_env_state[wav_idx].level - 0) / envelope_get_trans_samples(oscillators[wav_idx].amp_env_idx, RELEASE);
             }
         }
     }

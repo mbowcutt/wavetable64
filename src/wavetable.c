@@ -62,19 +62,19 @@ wavetable_t oscillators[NUM_OSCILLATORS];
 
 /// Initialize wavetable components.
 /// Generates all wavetables and the midi to frequency lookup table.
-/// Initializes a single sine wave voice with 50% sustain level.
+/// Initializes a single sine wave voice.
 void wavetable_init(void)
 {
     wavetable_generate_all();
     wavetable_generate_midi_freq_tbl();
 
-    oscillators[0].osc = SINE;
+    oscillators[0].shape = SINE;
     oscillators[0].gain = 127;
-    oscillators[0].amp_env = &envelopes[0];
+    oscillators[0].amp_env_idx = 0;
 
-    oscillators[1].osc = NONE;
+    oscillators[1].shape = NONE;
     oscillators[1].gain = 0;
-    oscillators[1].amp_env = &envelopes[1];
+    oscillators[1].amp_env_idx = 0;
 }
 
 /// Genarates all oscillator lookup tables and RMS normalizes them to the same

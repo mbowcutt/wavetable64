@@ -10,11 +10,16 @@
 
 #include <stddef.h>
 
-#define MIDI_CC_ATTACK 14
-#define MIDI_CC_DECAY 15
-#define MIDI_CC_SUSTAIN 13
-#define MIDI_CC_RELEASE 12
+#define MIDI_CC_DATA_ENTRY_MSB 6
+#define MIDI_CC_NRPN_LSB 98
+#define MIDI_CC_NRPN_MSB 99
+
+#define MIDI_CC_ENV1_ATTACK 14
+#define MIDI_CC_ENV1_DECAY 15
+#define MIDI_CC_ENV1_SUSTAIN 13
+#define MIDI_CC_ENV1_RELEASE 12
 #define MIDI_CC_GAIN 117
+#define MIDI_NRPN_OSC1_SHAPE 0x0003
 
 static size_t midi_in_bytes = 0;
 static uint32_t midi_rx_ctr = 0;
@@ -48,22 +53,22 @@ bool input_poll_and_handle(void)
         }
         else if (buttons.d_right)
         {
-            gui_select_right();
+            gui_nav_right();
             update_graphics = true;
         }
         else if (buttons.d_left)
         {
-            gui_select_left();
+            gui_nav_left();
             update_graphics = true;
         }
         else if (buttons.d_up)
         {
-            gui_select_up();
+            gui_nav_up();
             update_graphics = true;
         }
         else if (buttons.d_down)
         {
-            gui_select_down();
+            gui_nav_down();
             update_graphics = true;
         }
         else if (buttons.a)
@@ -77,29 +82,19 @@ bool input_poll_and_handle(void)
             update_graphics = true;
         }
     }
-    else if (field_selected)
+    else if (gui_recv_continuous_input())
     {
         buttons = joypad_get_buttons_held(JOYPAD_PORT_1);
         if (buttons.raw)
         {
-            if ((2 == selected_field_main) && buttons.d_right)
+            if (buttons.d_right)
             {
-                gui_select_right();
+                gui_nav_right();
                 update_graphics = true;
             }
-            else if ((2 == selected_field_main) && buttons.d_left)
+            else if (buttons.d_left)
             {
-                gui_select_left();
-                update_graphics = true;
-            }
-            else if ((1 == selected_field_main) && buttons.d_up)
-            {
-                gui_select_up();
-                update_graphics = true;
-            }
-            else if ((1 == selected_field_main) && buttons.d_down)
-            {
-                gui_select_down();
+                gui_nav_left();
                 update_graphics = true;
             }
         }
@@ -158,52 +153,52 @@ static bool input_handle_midi(size_t midi_in_bytes)
         {
             switch (msg.data[0])
             {
-                case MIDI_CC_ATTACK:
-                    voice_envelope_set_attack(msg.data[1]);
+                case MIDI_CC_ENV1_ATTACK:
+                    envelope_set_attack(0, ((uint16_t)msg.data[1] << 7));
                     update_graphics = true;
                     break;
-                case MIDI_CC_DECAY:
-                    voice_envelope_set_decay(msg.data[1]);
+                case MIDI_CC_ENV1_DECAY:
+                    envelope_set_decay(0, ((uint16_t)msg.data[1] << 7));
                     update_graphics = true;
                     break;
-                case MIDI_CC_SUSTAIN:
-                    voice_envelope_set_sustain(msg.data[1]);
+                case MIDI_CC_ENV1_SUSTAIN:
+                    envelope_set_sustain(0, ((((uint64_t)msg.data[1]) << 7) * UINT32_MAX) / MIDI_MAX_NRPN_VAL);
                     update_graphics = true;
                     break;
-                case MIDI_CC_RELEASE:
-                    voice_envelope_set_release(msg.data[1]);
+                case MIDI_CC_ENV1_RELEASE:
+                    envelope_set_release(0, ((uint16_t)msg.data[1] << 7));
                     update_graphics = true;
                     break;
                 case MIDI_CC_GAIN:
                     audio_engine_set_gain(msg.data[1]);
                     update_graphics = true;
                     break;
-                case 99:
+                case MIDI_CC_NRPN_MSB:
                     nrpn = ((uint16_t)msg.data[1]) << 7;
                     break;
-                case 98:
+                case MIDI_CC_NRPN_LSB:
                     nrpn |= msg.data[1];
                     break;
-                case 6:
+                case MIDI_CC_DATA_ENTRY_MSB:
                     switch (nrpn)
                     {
-                        case 0x0003:
+                        case MIDI_NRPN_OSC1_SHAPE:
                             switch (msg.data[1])
                             {
                                 case 0:
-                                    oscillators[0].osc = TRIANGLE;
+                                    oscillators[0].shape = TRIANGLE;
                                     update_graphics = true;
                                     break;
                                 case 1:
-                                    oscillators[0].osc = SINE;
+                                    oscillators[0].shape = SINE;
                                     update_graphics = true;
                                     break;
                                 case 2:
-                                    oscillators[0].osc = RAMP;
+                                    oscillators[0].shape = RAMP;
                                     update_graphics = true;
                                     break;
                                 case 3:
-                                    oscillators[0].osc = SQUARE;
+                                    oscillators[0].shape = SQUARE;
                                     update_graphics = true;
                                     break;
                                 default:
