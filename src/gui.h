@@ -6,6 +6,7 @@
 
 #include "init.h"
 
+#include <libdragon.h>
 #include <display.h>
 
 #define NUM_DISP_BUFFERS 3
@@ -15,7 +16,7 @@ void gui_draw_screen(void);
 void gui_splash(enum init_state_e init_state);
 void gui_draw_level_meter(display_context_t disp);
 
-bool gui_recv_continuous_input(void);
+bool gui_recv_continuous_input(joypad_buttons_t buttons_pressed);
 
 void gui_screen_next(void);
 void gui_screen_prev(void);

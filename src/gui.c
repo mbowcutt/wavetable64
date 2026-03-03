@@ -82,6 +82,7 @@ static void gui_print_menu(display_context_t disp);
 static void gui_print_main(display_context_t disp);
 
 static void gui_draw_osc(uint8_t osc_idx, int x_base, int y_base);
+static void gui_draw_env(uint8_t env_idx, int x_base, int y_base);
 
 static char * get_osc_shape_str(enum oscillator_shape_e osc_shape);
 
@@ -94,6 +95,11 @@ static void gui_osc_nav_left(void);
 static void gui_osc_nav_right(void);
 static void gui_osc_nav_up(void);
 static void gui_osc_nav_down(void);
+
+static void gui_env_nav_left(void);
+static void gui_env_nav_right(void);
+static void gui_env_nav_up(void);
+static void gui_env_nav_down(void);
 
 static color_t color_red = RGBA32(0xFF, 0, 0, 0xFF);
 static color_t color_green = RGBA32(0, 0xFF, 0, 0xFF);
@@ -335,6 +341,16 @@ static void gui_print_main(display_context_t disp)
         gui_draw_osc(osc_idx, x_base, y_base);
         x_base += 100 + 8;
     }
+
+    x_base = 242;
+    y_base = 34;
+
+    for (uint8_t env_idx = 0; env_idx < NUM_ENVELOPES; ++env_idx)
+    {
+        gui_draw_env(env_idx, x_base, y_base);
+
+        y_base += 58;
+    }
 }
 
 static void gui_draw_osc(uint8_t osc_idx, int x_base, int y_base)
@@ -350,9 +366,9 @@ static void gui_draw_osc(uint8_t osc_idx, int x_base, int y_base)
     }
     rdpq_fill_rectangle(x_base - 4, y_base, x_base + 100, y_base + 62);
 
-    if (gui_state.selected &&
-        (((0 == osc_idx) && (MAIN_SEL_OSC_1 == gui_state.sel))
-        || ((1 == osc_idx) && (MAIN_SEL_OSC_2 == gui_state.sel))))
+    if (gui_state.selected
+        && (((0 == osc_idx) && (MAIN_SEL_OSC_1 == gui_state.sel))
+            || ((1 == osc_idx) && (MAIN_SEL_OSC_2 == gui_state.sel))))
     {
         rdpq_set_fill_color(color_green);
         switch (gui_state.subsel.osc)
@@ -383,6 +399,74 @@ static void gui_draw_osc(uint8_t osc_idx, int x_base, int y_base)
     rdpq_text_printf(NULL, 1, x_base, y_base + 49, "AMP ENV: ENV %d",
                      osc->amp_env_idx + 1);
     rdpq_text_print(NULL, 1, x_base, y_base + 59, "GAIN:");
+}
+
+static void gui_draw_env(uint8_t env_idx, int x_base, int y_base)
+{
+    rdpq_set_mode_fill(color_gray);
+    if (((0 == env_idx) && (MAIN_SEL_ENV_1 == gui_state.sel))
+        || ((1 == env_idx) && (MAIN_SEL_ENV_2 == gui_state.sel))
+        || ((2 == env_idx) && (MAIN_SEL_ENV_3 == gui_state.sel)))
+    {
+        rdpq_set_mode_fill(color_blue);
+    }
+    else
+    {
+        rdpq_set_mode_fill(color_gray);
+    }
+    rdpq_fill_rectangle(x_base - 4, y_base, x_base + 244, y_base + 56);
+
+    if (gui_state.selected
+        && (((env_idx == 0) && (MAIN_SEL_ENV_1 == gui_state.sel))
+            || ((env_idx == 1) && (MAIN_SEL_ENV_2 == gui_state.sel))
+            || ((env_idx == 2) && (MAIN_SEL_ENV_3 == gui_state.sel))))
+    {
+        rdpq_set_fill_color(color_green);
+        switch (gui_state.subsel.env)
+        {
+            case MAIN_ENV_SUBSEL_A:
+                rdpq_fill_rectangle(x_base - 2, y_base + 45, x_base + 56, y_base + 55);
+                break;
+            case MAIN_ENV_SUBSEL_D:
+                rdpq_fill_rectangle(x_base + 58, y_base + 45, x_base + 116, y_base + 55);
+                break;
+            case MAIN_ENV_SUBSEL_S:
+                rdpq_fill_rectangle(x_base + 118, y_base + 45, x_base + 176, y_base + 55);
+                break;
+            case MAIN_ENV_SUBSEL_R:
+                rdpq_fill_rectangle(x_base + 178, y_base + 45, x_base + 236, y_base + 55);
+                break;
+            default:
+                break;
+        }
+    }
+
+    rdpq_set_fill_color(color_white);
+    float a1[] = {(float)x_base, (float)(y_base + 44)};
+    float a2[] = {x_base + (60 * ((float)envelopes[env_idx].attack / MIDI_MAX_NRPN_VAL)), (float)(y_base + 4)};
+    float a3[] = {a2[0], a1[1]};
+    float d1[] = {a2[0], a2[1]}; // same as a2
+    float d2[] = {a2[0], y_base + 4 + (40 * ((float)(UINT32_MAX - envelopes[env_idx].sustain_level) / UINT32_MAX))};
+    float d3[] = {a2[0] + (60 * ((float)envelopes[env_idx].decay / MIDI_MAX_NRPN_VAL)), d2[1]};
+    float r1[] = {(float)x_base + 240, a1[1]};
+    float r2[] = {r1[0] - (60 * ((float)envelopes[env_idx].release / MIDI_MAX_NRPN_VAL)), a1[1]};
+    float r3[] = {r2[0], d2[1]};
+
+    rdpq_triangle(&TRIFMT_FILL, a1, a2, a3);
+    rdpq_triangle(&TRIFMT_FILL, d1, d2, d3);
+    rdpq_triangle(&TRIFMT_FILL, r3, r2, r1);
+    rdpq_fill_rectangle(a2[0], d2[1], r2[0], a1[1]);
+
+    rdpq_text_printf(NULL, 1, x_base + 208, y_base + 14, "ENV %d",
+                     env_idx + 1);
+    rdpq_text_printf(NULL, 1, x_base,       y_base + 54, "A:%lums",
+                     (uint32_t)(env_sample_lut[envelopes[env_idx].attack] / 44.1f));
+    rdpq_text_printf(NULL, 1, x_base + 60,  y_base + 54, "D:%lums",
+                     (uint32_t)(env_sample_lut[envelopes[env_idx].decay] / 44.1f));
+    rdpq_text_printf(NULL, 1, x_base + 120, y_base + 54, "S: %2.1f%%",
+                     (float)(envelopes[env_idx].sustain_level) * 100 / UINT32_MAX);
+    rdpq_text_printf(NULL, 1, x_base + 180, y_base + 54, "R:%lums",
+                     (uint32_t)(env_sample_lut[envelopes[env_idx].release] / 44.1f));
 }
 
 void gui_screen_next(void)
@@ -456,9 +540,6 @@ void gui_nav_left(void)
     }
 }
 
-#define ENV_RATE_GRANULE (MIDI_MAX_NRPN_VAL / MIDI_MAX_DATA_BYTE)
-#define SUSTAIN_GRANULE (UINT32_MAX/ MIDI_MAX_DATA_BYTE)
-
 void gui_nav_up(void)
 {
     switch (gui_state.screen)
@@ -495,6 +576,11 @@ static void gui_main_nav_right(void)
             case MAIN_SEL_OSC_2:
                 gui_osc_nav_right();
                 break;
+            case MAIN_SEL_ENV_1:
+            case MAIN_SEL_ENV_2:
+            case MAIN_SEL_ENV_3:
+                gui_env_nav_right();
+                break;
             default:
                 break;
         }
@@ -507,7 +593,8 @@ static void gui_main_nav_right(void)
                 gui_state.sel = MAIN_SEL_OSC_2;
                 break;
             case MAIN_SEL_OSC_2:
-                /// TODO: Navigate to envelopes
+                gui_state.sel = MAIN_SEL_ENV_1;
+                gui_state.subsel.env = MAIN_ENV_SUBSEL_A;
                 break;
             default:
                 break;
@@ -525,6 +612,11 @@ static void gui_main_nav_left(void)
             case MAIN_SEL_OSC_2:
                 gui_osc_nav_left();
                 break;
+            case MAIN_SEL_ENV_1:
+            case MAIN_SEL_ENV_2:
+            case MAIN_SEL_ENV_3:
+                gui_env_nav_left();
+                break;
             default:
                 break;
         }
@@ -534,11 +626,15 @@ static void gui_main_nav_left(void)
         switch (gui_state.sel)
         {
             case MAIN_SEL_OSC_1:
-                /// TODO: Navigate to envelopes
                 break;
             case MAIN_SEL_OSC_2:
                 gui_state.sel = MAIN_SEL_OSC_1;
                 break;
+            case MAIN_SEL_ENV_1:
+            case MAIN_SEL_ENV_2:
+            case MAIN_SEL_ENV_3:
+                gui_state.sel = MAIN_SEL_OSC_2;
+                gui_state.subsel.osc = MAIN_OSC_SUBSEL_SHAPE;
             default:
                 break;
         }
@@ -555,13 +651,28 @@ static void gui_main_nav_up(void)
             case MAIN_SEL_OSC_2:
                 gui_osc_nav_up();
                 break;
+            case MAIN_SEL_ENV_1:
+            case MAIN_SEL_ENV_2:
+            case MAIN_SEL_ENV_3:
+                gui_env_nav_up();
+                break;
             default:
                 break;
         }
     }
     else
     {
-        /// TODO: Navigate
+        switch (gui_state.sel)
+        {
+            case MAIN_SEL_ENV_2:
+                gui_state.sel = MAIN_SEL_ENV_1;
+                break;
+            case MAIN_SEL_ENV_3:
+                gui_state.sel = MAIN_SEL_ENV_2;
+                break;
+            default:
+                break;
+        }
     }
 }
 
@@ -575,13 +686,28 @@ static void gui_main_nav_down(void)
             case MAIN_SEL_OSC_2:
                 gui_osc_nav_down();
                 break;
+            case MAIN_SEL_ENV_1:
+            case MAIN_SEL_ENV_2:
+            case MAIN_SEL_ENV_3:
+                gui_env_nav_down();
+                break;
             default:
                 break;
         }
     }
     else
     {
-        /// TODO: Navigate
+        switch (gui_state.sel)
+        {
+            case MAIN_SEL_ENV_1:
+                gui_state.sel = MAIN_SEL_ENV_2;
+                break;
+            case MAIN_SEL_ENV_2:
+                gui_state.sel = MAIN_SEL_ENV_3;
+                break;
+            default:
+                break;
+        }
     }
 }
 
@@ -688,6 +814,156 @@ static void gui_osc_nav_down(void)
     }
 }
 
+#define ENV_RATE_GRANULE (MIDI_MAX_NRPN_VAL / MIDI_MAX_DATA_BYTE)
+#define SUSTAIN_GRANULE (UINT32_MAX/ MIDI_MAX_DATA_BYTE)
+
+static void gui_env_nav_left(void)
+{
+    switch (gui_state.subsel.env)
+    {
+        case MAIN_ENV_SUBSEL_D:
+            gui_state.subsel.env = MAIN_ENV_SUBSEL_A;
+            break;
+
+        case MAIN_ENV_SUBSEL_S:
+            gui_state.subsel.env = MAIN_ENV_SUBSEL_D;
+            break;
+
+        case MAIN_ENV_SUBSEL_R:
+            gui_state.subsel.env = MAIN_ENV_SUBSEL_S;
+            break;
+
+        default:
+            break;
+    }
+}
+
+static void gui_env_nav_right(void)
+{
+    switch (gui_state.subsel.env)
+    {
+        case MAIN_ENV_SUBSEL_A:
+            gui_state.subsel.env = MAIN_ENV_SUBSEL_D;
+            break;
+
+        case MAIN_ENV_SUBSEL_D:
+            gui_state.subsel.env = MAIN_ENV_SUBSEL_S;
+            break;
+
+        case MAIN_ENV_SUBSEL_S:
+            gui_state.subsel.env = MAIN_ENV_SUBSEL_R;
+            break;
+
+        default:
+            break;
+    }
+}
+
+static void gui_env_nav_down(void)
+{
+    struct envelope_s * env = &envelopes[gui_state.sel - MAIN_SEL_ENV_1];
+    switch (gui_state.subsel.env)
+    {
+        case MAIN_ENV_SUBSEL_A:
+            if (ENV_RATE_GRANULE <= env->attack)
+            {
+                env->attack -= ENV_RATE_GRANULE;
+            }
+            else
+            {
+                env->attack = 0;
+            }
+            break;
+
+        case MAIN_ENV_SUBSEL_D:
+            if (ENV_RATE_GRANULE <= env->decay)
+            {
+                env->decay -= ENV_RATE_GRANULE;
+            }
+            else
+            {
+                env->decay = 0;
+            }
+            break;
+
+        case MAIN_ENV_SUBSEL_S:
+            if (SUSTAIN_GRANULE <= env->sustain_level)
+            {
+                env->sustain_level -= SUSTAIN_GRANULE;
+            }
+            else
+            {
+                env->sustain_level = 0;
+            }
+            break;
+
+        case MAIN_ENV_SUBSEL_R:
+            if (ENV_RATE_GRANULE <= env->release)
+            {
+                env->release -= ENV_RATE_GRANULE;
+            }
+            else
+            {
+                env->release = 0;
+            }
+            break;
+
+        default:
+            break;
+    }
+}
+
+static void gui_env_nav_up(void)
+{
+    struct envelope_s * env = &envelopes[gui_state.sel - MAIN_SEL_ENV_1];
+    switch (gui_state.subsel.env)
+    {
+        case MAIN_ENV_SUBSEL_A:
+            if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= env->attack)
+            {
+                env->attack += ENV_RATE_GRANULE;
+            }
+            else
+            {
+                env->attack = MIDI_MAX_NRPN_VAL;
+            }
+            break;
+
+        case MAIN_ENV_SUBSEL_D:
+            if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= env->decay)
+            {
+                env->decay += ENV_RATE_GRANULE;
+            }
+            else
+            {
+                env->decay = MIDI_MAX_NRPN_VAL;
+            }
+            break;
+        case MAIN_ENV_SUBSEL_S:
+            if ((UINT32_MAX - SUSTAIN_GRANULE) >= env->sustain_level)
+            {
+                env->sustain_level += SUSTAIN_GRANULE;
+            }
+            else
+            {
+                env->sustain_level = UINT32_MAX;
+            }
+            break;
+        case MAIN_ENV_SUBSEL_R:
+            if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= env->release)
+            {
+                env->release += ENV_RATE_GRANULE;
+            }
+            else
+            {
+                env->release = MIDI_MAX_NRPN_VAL;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
 void gui_select(void)
 {
     if (!gui_state.selected)
@@ -705,16 +981,25 @@ void gui_deselect(void)
     gui_state.selected = false;
 }
 
-bool gui_recv_continuous_input(void)
+bool gui_recv_continuous_input(joypad_buttons_t buttons_pressed)
 {
     bool ret = false;
 
-    if (gui_state.selected
-        && (((MAIN_SEL_OSC_1 == gui_state.sel)
-             || (MAIN_SEL_OSC_2 == gui_state.sel))
-            && (MAIN_OSC_SUBSEL_GAIN == gui_state.subsel.osc)))
+    if (gui_state.selected)
     {
-        ret = true;
+        if ((buttons_pressed.d_left || buttons_pressed.d_right)
+            && (((MAIN_SEL_OSC_1 == gui_state.sel) || (MAIN_SEL_OSC_2 == gui_state.sel))
+                && (MAIN_OSC_SUBSEL_GAIN == gui_state.subsel.osc)))
+        {
+            ret = true;
+        }
+        else if ((buttons_pressed.d_up || buttons_pressed.d_down)
+                 && ((MAIN_SEL_ENV_1 == gui_state.sel)
+                     || (MAIN_SEL_ENV_2 == gui_state.sel)
+                     || (MAIN_SEL_ENV_3 == gui_state.sel)))
+        {
+            ret = true;
+        }
     }
     return ret;
 }

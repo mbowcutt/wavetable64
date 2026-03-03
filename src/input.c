@@ -82,10 +82,10 @@ bool input_poll_and_handle(void)
             update_graphics = true;
         }
     }
-    else if (gui_recv_continuous_input())
+    else
     {
         buttons = joypad_get_buttons_held(JOYPAD_PORT_1);
-        if (buttons.raw)
+        if (buttons.raw && gui_recv_continuous_input(buttons))
         {
             if (buttons.d_right)
             {
@@ -95,6 +95,16 @@ bool input_poll_and_handle(void)
             else if (buttons.d_left)
             {
                 gui_nav_left();
+                update_graphics = true;
+            }
+            else if (buttons.d_up)
+            {
+                gui_nav_up();
+                update_graphics = true;
+            }
+            else if (buttons.d_down)
+            {
+                gui_nav_down();
                 update_graphics = true;
             }
         }

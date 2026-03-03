@@ -15,19 +15,19 @@ static void init_env_sample_lut(float t_min, float t_max)
         float seconds = t_min * powf(t_max / t_min, (float)idx / (float)MIDI_MAX_NRPN_VAL);
         env_sample_lut[idx] = (uint64_t)(seconds * SAMPLE_RATE);
     }
-
-    for (size_t env_idx = 0; env_idx < NUM_ENVELOPES; ++env_idx)
-    {
-        envelopes[env_idx].attack = 0;
-        envelopes[env_idx].decay = 0;
-        envelopes[env_idx].sustain_level = UINT32_MAX / 2;
-        envelopes[env_idx].release = 0;
-    }
 }
 
 void envelope_init(void)
 {
     init_env_sample_lut(0.001f, 10.0f);
+
+    for (size_t env_idx = 0; env_idx < NUM_ENVELOPES; ++env_idx)
+    {
+        envelopes[env_idx].attack = MIDI_MAX_NRPN_VAL / 2;
+        envelopes[env_idx].decay = MIDI_MAX_NRPN_VAL;
+        envelopes[env_idx].sustain_level = UINT32_MAX / 2;
+        envelopes[env_idx].release = MIDI_MAX_NRPN_VAL / 2;
+    }
 }
 
 void envelope_set_attack(uint8_t idx, uint16_t data)
