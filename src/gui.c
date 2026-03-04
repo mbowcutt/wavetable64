@@ -3,6 +3,7 @@
 #include "init.h"
 #include "audio_engine.h"
 #include "envelope.h"
+#include "lfo.h"
 #include "voice.h"
 #include "wavetable.h"
 
@@ -17,6 +18,7 @@
 enum menu_screen_e
 {
     SCREEN_OSC_ENV,
+    SCREEN_LFO,
     SCREEN_FILE,
     SCREEN_DEBUG,
     SCREEN_SETTINGS
@@ -24,38 +26,39 @@ enum menu_screen_e
 
 enum main_sel_e
 {
-    MAIN_SEL_OSC_1,
-    MAIN_SEL_OSC_2,
+    SEL_OSC_1,
+    SEL_OSC_2,
 
-    MAIN_SEL_ENV_1,
-    MAIN_SEL_ENV_2,
-    MAIN_SEL_ENV_3,
+    SEL_ENV_1,
+    SEL_ENV_2,
+    SEL_ENV_3,
 
-    MAIN_SEL_LFO_1,
-    MAIN_SEL_LFO_2,
+    SEL_LFO_1,
+    SEL_LFO_2,
 };
 
-enum main_osc_subsel_e
+enum osc_subsel_e
 {
-    MAIN_OSC_SUBSEL_SHAPE,
-    MAIN_OSC_SUBSEL_AMP_ENV,
-    MAIN_OSC_SUBSEL_GAIN,
+    OSC_SUBSEL_SHAPE,
+    OSC_SUBSEL_AMP_ENV,
+    OSC_SUBSEL_GAIN,
 };
 
-enum main_env_subsel_e
+enum env_subsel_e
 {
-    MAIN_ENV_SUBSEL_A,
-    MAIN_ENV_SUBSEL_D,
-    MAIN_ENV_SUBSEL_S,
-    MAIN_ENV_SUBSEL_R,
+    ENV_SUBSEL_A,
+    ENV_SUBSEL_D,
+    ENV_SUBSEL_S,
+    ENV_SUBSEL_R,
 };
 
-enum main_lfo_subsel_e
+enum lfo_subsel_e
 {
-    MAIN_LFO_SUBSEL_SHAPE,
-    MAIN_LFO_SUBSEL_RATE,
-    MAIN_LFO_SUBSEL_DEPTH,
-    MAIN_LFO_SUBSEL_DST,
+    LFO_SUBSEL_SHAPE,
+    LFO_SUBSEL_RATE,
+    LFO_SUBSEL_DEPTH,
+    LFO_SUBSEL_DST_AMP,
+    LFO_SUBSEL_DST_PITCH,
 };
 
 static struct {
@@ -64,25 +67,27 @@ static struct {
     bool selected;
     union
     {
-        enum main_osc_subsel_e osc;
-        enum main_env_subsel_e env;
-        enum main_lfo_subsel_e lfo;
+        enum osc_subsel_e osc;
+        enum env_subsel_e env;
+        enum lfo_subsel_e lfo;
     } subsel;
 } gui_state =
 {
     .screen = SCREEN_OSC_ENV,
-    .sel = MAIN_SEL_OSC_1,
+    .sel = SEL_OSC_1,
     .selected = false,
-    .subsel.osc = MAIN_OSC_SUBSEL_SHAPE,
+    .subsel.osc = OSC_SUBSEL_SHAPE,
 };
 
 static void gui_draw_header(display_context_t disp);
 static void gui_draw_footer(display_context_t disp);
 static void gui_draw_menu(display_context_t disp);
-static void gui_draw_osc_env(display_context_t disp);
 
+static void gui_draw_osc_env(display_context_t disp);
 static void gui_draw_osc(uint8_t osc_idx, int x_base, int y_base);
 static void gui_draw_env(uint8_t env_idx, int x_base, int y_base);
+
+static void gui_draw_lfo(void);
 
 static char * get_osc_shape_str(enum oscillator_shape_e osc_shape);
 
@@ -100,6 +105,11 @@ static void gui_nav_env_left(void);
 static void gui_nav_env_right(void);
 static void gui_nav_env_up(void);
 static void gui_nav_env_down(void);
+
+static void gui_nav_lfo_left(void);
+static void gui_nav_lfo_right(void);
+static void gui_nav_lfo_up(void);
+static void gui_nav_lfo_down(void);
 
 static color_t color_red = RGBA32(0xFF, 0, 0, 0xFF);
 static color_t color_green = RGBA32(0, 0xFF, 0, 0xFF);
@@ -138,6 +148,9 @@ void gui_draw_screen(void)
     {
         case SCREEN_OSC_ENV:
             gui_draw_osc_env(disp);
+            break;
+        case SCREEN_LFO:
+            gui_draw_lfo();
             break;
         case SCREEN_FILE:
             break;
@@ -258,14 +271,17 @@ static void gui_draw_menu(display_context_t disp)
         case SCREEN_OSC_ENV:
             rdpq_fill_rectangle(108, 19, 170, 30);
             break;
+        case SCREEN_LFO:
+            rdpq_fill_rectangle(196, 19, 222, 30);
+            break;
         case SCREEN_FILE:
-            rdpq_fill_rectangle(196, 19, 228, 30);
+            rdpq_fill_rectangle(248, 19, 280, 30);
             break;
         case SCREEN_DEBUG:
-            rdpq_fill_rectangle(254, 19, 292, 30);
+            rdpq_fill_rectangle(306, 19, 344, 30);
             break;
         case SCREEN_SETTINGS:
-            rdpq_fill_rectangle(318, 19, 374, 30);
+            rdpq_fill_rectangle(372, 19, 428, 30);
             break;
         default:
             break;
@@ -273,9 +289,10 @@ static void gui_draw_menu(display_context_t disp)
 
     rdpq_text_print(NULL, 1, 28, 28, "<< L");
     rdpq_text_print(NULL, 1, 112, 28, "OSC & ENV");
-    rdpq_text_print(NULL, 1, 200, 28, "FILE");
-    rdpq_text_print(NULL, 1, 258, 28, "DEBUG");
-    rdpq_text_print(NULL, 1, 322, 28, "SETTINGS");
+    rdpq_text_print(NULL, 1, 200, 28, "LFO");
+    rdpq_text_print(NULL, 1, 252, 28, "FILE");
+    rdpq_text_print(NULL, 1, 310, 28, "DEBUG");
+    rdpq_text_print(NULL, 1, 376, 28, "SETTINGS");
     rdpq_text_print(NULL, 1, 488, 28, "R >>");
 
 }
@@ -355,8 +372,8 @@ static void gui_draw_osc_env(display_context_t disp)
 
 static void gui_draw_osc(uint8_t osc_idx, int x_base, int y_base)
 {
-    if (((0 == osc_idx) && (MAIN_SEL_OSC_1 == gui_state.sel))
-        || ((1 == osc_idx) && (MAIN_SEL_OSC_2 == gui_state.sel)))
+    if (((0 == osc_idx) && (SEL_OSC_1 == gui_state.sel))
+        || ((1 == osc_idx) && (SEL_OSC_2 == gui_state.sel)))
     {
         rdpq_set_mode_fill(color_blue);
     }
@@ -367,19 +384,19 @@ static void gui_draw_osc(uint8_t osc_idx, int x_base, int y_base)
     rdpq_fill_rectangle(x_base - 4, y_base, x_base + 100, y_base + 62);
 
     if (gui_state.selected
-        && (((0 == osc_idx) && (MAIN_SEL_OSC_1 == gui_state.sel))
-            || ((1 == osc_idx) && (MAIN_SEL_OSC_2 == gui_state.sel))))
+        && (((0 == osc_idx) && (SEL_OSC_1 == gui_state.sel))
+            || ((1 == osc_idx) && (SEL_OSC_2 == gui_state.sel))))
     {
         rdpq_set_fill_color(color_green);
         switch (gui_state.subsel.osc)
         {
-            case MAIN_OSC_SUBSEL_SHAPE:
+            case OSC_SUBSEL_SHAPE:
                 rdpq_fill_rectangle(x_base - 2, y_base + 1, x_base + 98, y_base + 12);
                 break;
-            case MAIN_OSC_SUBSEL_AMP_ENV:
+            case OSC_SUBSEL_AMP_ENV:
                 rdpq_fill_rectangle(x_base - 2, y_base + 40, x_base + 98, y_base + 51);
                 break;
-            case MAIN_OSC_SUBSEL_GAIN:
+            case OSC_SUBSEL_GAIN:
                 rdpq_fill_rectangle(x_base - 2, y_base + 50, x_base + 98, y_base + 61);
                 break;
         }
@@ -404,9 +421,9 @@ static void gui_draw_osc(uint8_t osc_idx, int x_base, int y_base)
 static void gui_draw_env(uint8_t env_idx, int x_base, int y_base)
 {
     rdpq_set_mode_fill(color_gray);
-    if (((0 == env_idx) && (MAIN_SEL_ENV_1 == gui_state.sel))
-        || ((1 == env_idx) && (MAIN_SEL_ENV_2 == gui_state.sel))
-        || ((2 == env_idx) && (MAIN_SEL_ENV_3 == gui_state.sel)))
+    if (((0 == env_idx) && (SEL_ENV_1 == gui_state.sel))
+        || ((1 == env_idx) && (SEL_ENV_2 == gui_state.sel))
+        || ((2 == env_idx) && (SEL_ENV_3 == gui_state.sel)))
     {
         rdpq_set_mode_fill(color_blue);
     }
@@ -417,23 +434,23 @@ static void gui_draw_env(uint8_t env_idx, int x_base, int y_base)
     rdpq_fill_rectangle(x_base - 4, y_base, x_base + 244, y_base + 56);
 
     if (gui_state.selected
-        && (((env_idx == 0) && (MAIN_SEL_ENV_1 == gui_state.sel))
-            || ((env_idx == 1) && (MAIN_SEL_ENV_2 == gui_state.sel))
-            || ((env_idx == 2) && (MAIN_SEL_ENV_3 == gui_state.sel))))
+        && (((env_idx == 0) && (SEL_ENV_1 == gui_state.sel))
+            || ((env_idx == 1) && (SEL_ENV_2 == gui_state.sel))
+            || ((env_idx == 2) && (SEL_ENV_3 == gui_state.sel))))
     {
         rdpq_set_fill_color(color_green);
         switch (gui_state.subsel.env)
         {
-            case MAIN_ENV_SUBSEL_A:
+            case ENV_SUBSEL_A:
                 rdpq_fill_rectangle(x_base - 2, y_base + 45, x_base + 56, y_base + 55);
                 break;
-            case MAIN_ENV_SUBSEL_D:
+            case ENV_SUBSEL_D:
                 rdpq_fill_rectangle(x_base + 58, y_base + 45, x_base + 116, y_base + 55);
                 break;
-            case MAIN_ENV_SUBSEL_S:
+            case ENV_SUBSEL_S:
                 rdpq_fill_rectangle(x_base + 118, y_base + 45, x_base + 176, y_base + 55);
                 break;
-            case MAIN_ENV_SUBSEL_R:
+            case ENV_SUBSEL_R:
                 rdpq_fill_rectangle(x_base + 178, y_base + 45, x_base + 236, y_base + 55);
                 break;
             default:
@@ -469,6 +486,66 @@ static void gui_draw_env(uint8_t env_idx, int x_base, int y_base)
                      (uint32_t)(env_sample_lut[envelopes[env_idx].release] / 44.1f));
 }
 
+static void gui_draw_lfo(void)
+{
+    int x_base = 40;
+    int y_base = 45;
+
+    for (uint8_t lfo_idx = 0; lfo_idx < NUM_LFOS; ++lfo_idx)
+    {
+        if (((0 == lfo_idx) && (SEL_LFO_1 == gui_state.sel))
+            || ((1 == lfo_idx) && (SEL_LFO_2 == gui_state.sel)))
+        {
+            rdpq_set_mode_fill(color_blue);
+        }
+        else
+        {
+            rdpq_set_mode_fill(color_gray);
+        }
+        rdpq_fill_rectangle(x_base - 4, y_base - 10, x_base + 94, y_base + 53);
+
+        if (gui_state.selected
+            && (((0 == lfo_idx) && (SEL_LFO_1 == gui_state.sel))
+                || ((1 == lfo_idx) && (SEL_LFO_2 == gui_state.sel))))
+        {
+            rdpq_set_mode_fill(color_green);
+            switch (gui_state.subsel.lfo)
+            {
+                case LFO_SUBSEL_SHAPE:
+                    rdpq_fill_rectangle(x_base - 2, y_base + 1, x_base + 92, y_base + 12);
+                    break;
+                case LFO_SUBSEL_RATE:
+                    rdpq_fill_rectangle(x_base - 2, y_base + 11, x_base + 92, y_base + 22);
+                    break;
+                case LFO_SUBSEL_DEPTH:
+                    rdpq_fill_rectangle(x_base - 2, y_base + 21, x_base + 92, y_base + 32);
+                    break;
+                case LFO_SUBSEL_DST_AMP:
+                    rdpq_fill_rectangle(x_base - 2, y_base + 31, x_base + 92, y_base + 42);
+                    break;
+                case LFO_SUBSEL_DST_PITCH:
+                    rdpq_fill_rectangle(x_base - 2, y_base + 41, x_base + 92, y_base + 52);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        lfo_t * lfo = &lfos[lfo_idx];
+        float rate = 0.0f;
+        float depth = 0.0f;
+
+        rdpq_text_printf(NULL, 1, x_base, y_base, "LFO %d", lfo_idx + 1);
+        rdpq_text_printf(NULL, 1, x_base, y_base + 10, "SHAPE: %s", get_osc_shape_str(lfo->shape));
+        rdpq_text_printf(NULL, 1, x_base, y_base + 20, "RATE: %f", rate);
+        rdpq_text_printf(NULL, 1, x_base, y_base + 30, "DEPTH: %f", depth);
+        rdpq_text_printf(NULL, 1, x_base, y_base + 40, "AMPLITUDE....%c", (LFO_DST_AMP & lfo->dst) ? 'Y':'N' );
+        rdpq_text_printf(NULL, 1, x_base, y_base + 50, "PITCH........%c", (LFO_DST_FREQ & lfo->dst) ? 'Y':'N' );
+
+        x_base += 105;
+    }
+}
+
 void gui_screen_next(void)
 {
     if (SCREEN_SETTINGS == gui_state.screen)
@@ -479,6 +556,19 @@ void gui_screen_next(void)
     {
         ++gui_state.screen;
     }
+
+    switch(gui_state.screen)
+    {
+        case SCREEN_OSC_ENV:
+            gui_state.sel = SEL_OSC_1;
+            break;
+        case SCREEN_LFO:
+            gui_state.sel = SEL_LFO_1;
+            break;
+        default:
+            break;
+    }
+
     gui_state.selected = false;
 }
 
@@ -521,7 +611,8 @@ void gui_nav_right(void)
         case SCREEN_OSC_ENV:
             gui_nav_osc_env_right();
             break;
-
+        case SCREEN_LFO:
+            gui_nav_lfo_right();
         default:
             break;
     }
@@ -534,7 +625,8 @@ void gui_nav_left(void)
         case SCREEN_OSC_ENV:
             gui_nav_osc_env_left();
             break;
-
+        case SCREEN_LFO:
+            gui_nav_lfo_left();
         default:
             break;
     }
@@ -547,7 +639,8 @@ void gui_nav_up(void)
         case SCREEN_OSC_ENV:
             gui_nav_osc_env_up();
             break;
-
+        case SCREEN_LFO:
+            gui_nav_lfo_up();
         default:
             break;
     }
@@ -560,7 +653,8 @@ void gui_nav_down(void)
         case SCREEN_OSC_ENV:
             gui_nav_osc_env_down();
             break;
-
+        case SCREEN_LFO:
+            gui_nav_lfo_down();
         default:
             break;
     }
@@ -572,13 +666,13 @@ static void gui_nav_osc_env_right(void)
     {
         switch (gui_state.sel)
         {
-            case MAIN_SEL_OSC_1:
-            case MAIN_SEL_OSC_2:
+            case SEL_OSC_1:
+            case SEL_OSC_2:
                 gui_nav_osc_right();
                 break;
-            case MAIN_SEL_ENV_1:
-            case MAIN_SEL_ENV_2:
-            case MAIN_SEL_ENV_3:
+            case SEL_ENV_1:
+            case SEL_ENV_2:
+            case SEL_ENV_3:
                 gui_nav_env_right();
                 break;
             default:
@@ -589,12 +683,12 @@ static void gui_nav_osc_env_right(void)
     {
         switch (gui_state.sel)
         {
-            case MAIN_SEL_OSC_1:
-                gui_state.sel = MAIN_SEL_OSC_2;
+            case SEL_OSC_1:
+                gui_state.sel = SEL_OSC_2;
                 break;
-            case MAIN_SEL_OSC_2:
-                gui_state.sel = MAIN_SEL_ENV_1;
-                gui_state.subsel.env = MAIN_ENV_SUBSEL_A;
+            case SEL_OSC_2:
+                gui_state.sel = SEL_ENV_1;
+                gui_state.subsel.env = ENV_SUBSEL_A;
                 break;
             default:
                 break;
@@ -608,13 +702,13 @@ static void gui_nav_osc_env_left(void)
     {
         switch (gui_state.sel)
         {
-            case MAIN_SEL_OSC_1:
-            case MAIN_SEL_OSC_2:
+            case SEL_OSC_1:
+            case SEL_OSC_2:
                 gui_nav_osc_left();
                 break;
-            case MAIN_SEL_ENV_1:
-            case MAIN_SEL_ENV_2:
-            case MAIN_SEL_ENV_3:
+            case SEL_ENV_1:
+            case SEL_ENV_2:
+            case SEL_ENV_3:
                 gui_nav_env_left();
                 break;
             default:
@@ -625,16 +719,16 @@ static void gui_nav_osc_env_left(void)
     {
         switch (gui_state.sel)
         {
-            case MAIN_SEL_OSC_1:
+            case SEL_OSC_1:
                 break;
-            case MAIN_SEL_OSC_2:
-                gui_state.sel = MAIN_SEL_OSC_1;
+            case SEL_OSC_2:
+                gui_state.sel = SEL_OSC_1;
                 break;
-            case MAIN_SEL_ENV_1:
-            case MAIN_SEL_ENV_2:
-            case MAIN_SEL_ENV_3:
-                gui_state.sel = MAIN_SEL_OSC_2;
-                gui_state.subsel.osc = MAIN_OSC_SUBSEL_SHAPE;
+            case SEL_ENV_1:
+            case SEL_ENV_2:
+            case SEL_ENV_3:
+                gui_state.sel = SEL_OSC_2;
+                gui_state.subsel.osc = OSC_SUBSEL_SHAPE;
             default:
                 break;
         }
@@ -647,13 +741,13 @@ static void gui_nav_osc_env_up(void)
     {
         switch (gui_state.sel)
         {
-            case MAIN_SEL_OSC_1:
-            case MAIN_SEL_OSC_2:
+            case SEL_OSC_1:
+            case SEL_OSC_2:
                 gui_nav_osc_up();
                 break;
-            case MAIN_SEL_ENV_1:
-            case MAIN_SEL_ENV_2:
-            case MAIN_SEL_ENV_3:
+            case SEL_ENV_1:
+            case SEL_ENV_2:
+            case SEL_ENV_3:
                 gui_nav_env_up();
                 break;
             default:
@@ -664,11 +758,11 @@ static void gui_nav_osc_env_up(void)
     {
         switch (gui_state.sel)
         {
-            case MAIN_SEL_ENV_2:
-                gui_state.sel = MAIN_SEL_ENV_1;
+            case SEL_ENV_2:
+                gui_state.sel = SEL_ENV_1;
                 break;
-            case MAIN_SEL_ENV_3:
-                gui_state.sel = MAIN_SEL_ENV_2;
+            case SEL_ENV_3:
+                gui_state.sel = SEL_ENV_2;
                 break;
             default:
                 break;
@@ -682,13 +776,13 @@ static void gui_nav_osc_env_down(void)
     {
         switch (gui_state.sel)
         {
-            case MAIN_SEL_OSC_1:
-            case MAIN_SEL_OSC_2:
+            case SEL_OSC_1:
+            case SEL_OSC_2:
                 gui_nav_osc_down();
                 break;
-            case MAIN_SEL_ENV_1:
-            case MAIN_SEL_ENV_2:
-            case MAIN_SEL_ENV_3:
+            case SEL_ENV_1:
+            case SEL_ENV_2:
+            case SEL_ENV_3:
                 gui_nav_env_down();
                 break;
             default:
@@ -699,11 +793,11 @@ static void gui_nav_osc_env_down(void)
     {
         switch (gui_state.sel)
         {
-            case MAIN_SEL_ENV_1:
-                gui_state.sel = MAIN_SEL_ENV_2;
+            case SEL_ENV_1:
+                gui_state.sel = SEL_ENV_2;
                 break;
-            case MAIN_SEL_ENV_2:
-                gui_state.sel = MAIN_SEL_ENV_3;
+            case SEL_ENV_2:
+                gui_state.sel = SEL_ENV_3;
                 break;
             default:
                 break;
@@ -713,11 +807,11 @@ static void gui_nav_osc_env_down(void)
 
 static void gui_nav_osc_left(void)
 {
-    wavetable_t * osc = &oscillators[gui_state.sel - MAIN_SEL_OSC_1];
+    wavetable_t * osc = &oscillators[gui_state.sel - SEL_OSC_1];
  
     switch (gui_state.subsel.osc)
     {
-        case MAIN_OSC_SUBSEL_SHAPE:
+        case OSC_SUBSEL_SHAPE:
             if (SINE == osc->shape)
             {
                 osc->shape = NONE;
@@ -727,7 +821,7 @@ static void gui_nav_osc_left(void)
                 --osc->shape;
             }
             break;
-        case MAIN_OSC_SUBSEL_AMP_ENV:
+        case OSC_SUBSEL_AMP_ENV:
             if (0 == osc->amp_env_idx)
             {
                 osc->amp_env_idx = NUM_ENVELOPES - 1;
@@ -737,7 +831,7 @@ static void gui_nav_osc_left(void)
                 --osc->amp_env_idx;
             }
             break;
-        case MAIN_OSC_SUBSEL_GAIN:
+        case OSC_SUBSEL_GAIN:
             if (0 < osc->gain)
             {
                 --osc->gain;
@@ -750,10 +844,10 @@ static void gui_nav_osc_left(void)
 
 static void gui_nav_osc_right(void)
 {
-    wavetable_t * osc = &oscillators[gui_state.sel - MAIN_SEL_OSC_1];
+    wavetable_t * osc = &oscillators[gui_state.sel - SEL_OSC_1];
     switch (gui_state.subsel.osc)
     {
-        case MAIN_OSC_SUBSEL_SHAPE:
+        case OSC_SUBSEL_SHAPE:
             if (NONE == osc->shape)
             {
                 osc->shape = SINE;
@@ -763,7 +857,7 @@ static void gui_nav_osc_right(void)
                 ++osc->shape;
             }
             break;
-        case MAIN_OSC_SUBSEL_AMP_ENV:
+        case OSC_SUBSEL_AMP_ENV:
             if ((NUM_ENVELOPES - 1) == osc->amp_env_idx)
             {
                 osc->amp_env_idx = 0;
@@ -773,7 +867,7 @@ static void gui_nav_osc_right(void)
                 ++osc->amp_env_idx;
             }
             break;
-        case MAIN_OSC_SUBSEL_GAIN:
+        case OSC_SUBSEL_GAIN:
             if (MIDI_MAX_DATA_BYTE > osc->gain)
             {
                 ++osc->gain;
@@ -788,13 +882,13 @@ static void gui_nav_osc_up(void)
 {
     switch (gui_state.subsel.osc)
     {
-        case MAIN_OSC_SUBSEL_SHAPE:
+        case OSC_SUBSEL_SHAPE:
             break;
-        case MAIN_OSC_SUBSEL_AMP_ENV:
-            gui_state.subsel.osc = MAIN_OSC_SUBSEL_SHAPE;
+        case OSC_SUBSEL_AMP_ENV:
+            gui_state.subsel.osc = OSC_SUBSEL_SHAPE;
             break;
-        case MAIN_OSC_SUBSEL_GAIN:
-            gui_state.subsel.osc = MAIN_OSC_SUBSEL_AMP_ENV;
+        case OSC_SUBSEL_GAIN:
+            gui_state.subsel.osc = OSC_SUBSEL_AMP_ENV;
             break;
     }
 }
@@ -803,13 +897,13 @@ static void gui_nav_osc_down(void)
 {
     switch (gui_state.subsel.osc)
     {
-        case MAIN_OSC_SUBSEL_SHAPE:
-            gui_state.subsel.osc = MAIN_OSC_SUBSEL_AMP_ENV;
+        case OSC_SUBSEL_SHAPE:
+            gui_state.subsel.osc = OSC_SUBSEL_AMP_ENV;
             break;
-        case MAIN_OSC_SUBSEL_AMP_ENV:
-            gui_state.subsel.osc = MAIN_OSC_SUBSEL_GAIN;
+        case OSC_SUBSEL_AMP_ENV:
+            gui_state.subsel.osc = OSC_SUBSEL_GAIN;
             break;
-        case MAIN_OSC_SUBSEL_GAIN:
+        case OSC_SUBSEL_GAIN:
             break;
     }
 }
@@ -821,16 +915,16 @@ static void gui_nav_env_left(void)
 {
     switch (gui_state.subsel.env)
     {
-        case MAIN_ENV_SUBSEL_D:
-            gui_state.subsel.env = MAIN_ENV_SUBSEL_A;
+        case ENV_SUBSEL_D:
+            gui_state.subsel.env = ENV_SUBSEL_A;
             break;
 
-        case MAIN_ENV_SUBSEL_S:
-            gui_state.subsel.env = MAIN_ENV_SUBSEL_D;
+        case ENV_SUBSEL_S:
+            gui_state.subsel.env = ENV_SUBSEL_D;
             break;
 
-        case MAIN_ENV_SUBSEL_R:
-            gui_state.subsel.env = MAIN_ENV_SUBSEL_S;
+        case ENV_SUBSEL_R:
+            gui_state.subsel.env = ENV_SUBSEL_S;
             break;
 
         default:
@@ -842,16 +936,16 @@ static void gui_nav_env_right(void)
 {
     switch (gui_state.subsel.env)
     {
-        case MAIN_ENV_SUBSEL_A:
-            gui_state.subsel.env = MAIN_ENV_SUBSEL_D;
+        case ENV_SUBSEL_A:
+            gui_state.subsel.env = ENV_SUBSEL_D;
             break;
 
-        case MAIN_ENV_SUBSEL_D:
-            gui_state.subsel.env = MAIN_ENV_SUBSEL_S;
+        case ENV_SUBSEL_D:
+            gui_state.subsel.env = ENV_SUBSEL_S;
             break;
 
-        case MAIN_ENV_SUBSEL_S:
-            gui_state.subsel.env = MAIN_ENV_SUBSEL_R;
+        case ENV_SUBSEL_S:
+            gui_state.subsel.env = ENV_SUBSEL_R;
             break;
 
         default:
@@ -861,10 +955,10 @@ static void gui_nav_env_right(void)
 
 static void gui_nav_env_down(void)
 {
-    struct envelope_s * env = &envelopes[gui_state.sel - MAIN_SEL_ENV_1];
+    struct envelope_s * env = &envelopes[gui_state.sel - SEL_ENV_1];
     switch (gui_state.subsel.env)
     {
-        case MAIN_ENV_SUBSEL_A:
+        case ENV_SUBSEL_A:
             if (ENV_RATE_GRANULE <= env->attack)
             {
                 env->attack -= ENV_RATE_GRANULE;
@@ -875,7 +969,7 @@ static void gui_nav_env_down(void)
             }
             break;
 
-        case MAIN_ENV_SUBSEL_D:
+        case ENV_SUBSEL_D:
             if (ENV_RATE_GRANULE <= env->decay)
             {
                 env->decay -= ENV_RATE_GRANULE;
@@ -886,7 +980,7 @@ static void gui_nav_env_down(void)
             }
             break;
 
-        case MAIN_ENV_SUBSEL_S:
+        case ENV_SUBSEL_S:
             if (SUSTAIN_GRANULE <= env->sustain_level)
             {
                 env->sustain_level -= SUSTAIN_GRANULE;
@@ -897,7 +991,7 @@ static void gui_nav_env_down(void)
             }
             break;
 
-        case MAIN_ENV_SUBSEL_R:
+        case ENV_SUBSEL_R:
             if (ENV_RATE_GRANULE <= env->release)
             {
                 env->release -= ENV_RATE_GRANULE;
@@ -915,10 +1009,10 @@ static void gui_nav_env_down(void)
 
 static void gui_nav_env_up(void)
 {
-    struct envelope_s * env = &envelopes[gui_state.sel - MAIN_SEL_ENV_1];
+    struct envelope_s * env = &envelopes[gui_state.sel - SEL_ENV_1];
     switch (gui_state.subsel.env)
     {
-        case MAIN_ENV_SUBSEL_A:
+        case ENV_SUBSEL_A:
             if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= env->attack)
             {
                 env->attack += ENV_RATE_GRANULE;
@@ -929,7 +1023,7 @@ static void gui_nav_env_up(void)
             }
             break;
 
-        case MAIN_ENV_SUBSEL_D:
+        case ENV_SUBSEL_D:
             if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= env->decay)
             {
                 env->decay += ENV_RATE_GRANULE;
@@ -939,7 +1033,7 @@ static void gui_nav_env_up(void)
                 env->decay = MIDI_MAX_NRPN_VAL;
             }
             break;
-        case MAIN_ENV_SUBSEL_S:
+        case ENV_SUBSEL_S:
             if ((UINT32_MAX - SUSTAIN_GRANULE) >= env->sustain_level)
             {
                 env->sustain_level += SUSTAIN_GRANULE;
@@ -949,7 +1043,7 @@ static void gui_nav_env_up(void)
                 env->sustain_level = UINT32_MAX;
             }
             break;
-        case MAIN_ENV_SUBSEL_R:
+        case ENV_SUBSEL_R:
             if ((MIDI_MAX_NRPN_VAL - ENV_RATE_GRANULE) >= env->release)
             {
                 env->release += ENV_RATE_GRANULE;
@@ -962,6 +1056,120 @@ static void gui_nav_env_up(void)
         default:
             break;
     }
+}
+
+static void gui_nav_lfo_left(void)
+{
+    uint8_t lfo_idx = (gui_state.sel - SEL_LFO_1);
+    if (gui_state.selected)
+    {
+        lfo_t * lfo = &lfos[lfo_idx];
+        switch (gui_state.subsel.lfo)
+        {
+            case LFO_SUBSEL_SHAPE:
+                if (NONE == lfo->shape)
+                {
+                    lfo->shape = SINE;
+                }
+                else
+                {
+                    --lfo->shape;
+                }
+                break;
+
+            /// TODO: Set Rate and Depth
+            case LFO_SUBSEL_RATE:
+                break;
+            case LFO_SUBSEL_DEPTH:
+                break;
+
+            case LFO_SUBSEL_DST_AMP:
+                lfo->dst ^= LFO_DST_AMP;
+                break;
+            case LFO_SUBSEL_DST_PITCH:
+                lfo->dst ^= LFO_DST_FREQ;
+                break;
+
+            default:
+                break;
+        }
+    }
+    else
+    {
+        if (0 != lfo_idx)
+        {
+            --gui_state.sel;
+        }
+    }
+}
+
+static void gui_nav_lfo_right(void)
+{
+    uint8_t lfo_idx = (gui_state.sel - SEL_LFO_1);
+    if (gui_state.selected)
+    {
+        lfo_t * lfo = &lfos[lfo_idx];
+        switch (gui_state.subsel.lfo)
+        {
+            case LFO_SUBSEL_SHAPE:
+                if (NONE == lfo->shape)
+                {
+                    lfo->shape = SINE;
+                }
+                else
+                {
+                    ++lfo->shape;
+                }
+                break;
+
+            /// TODO: Set Rate and Depth
+            case LFO_SUBSEL_RATE:
+                break;
+            case LFO_SUBSEL_DEPTH:
+                break;
+
+            case LFO_SUBSEL_DST_AMP:
+                lfo->dst ^= LFO_DST_AMP;
+                break;
+            case LFO_SUBSEL_DST_PITCH:
+                lfo->dst ^= LFO_DST_FREQ;
+                break;
+
+        default:
+                break;
+        }
+    }
+    else
+    {
+        if (NUM_LFOS != (1 + lfo_idx))
+        {
+            ++gui_state.sel;
+        }
+    }
+}
+
+static void gui_nav_lfo_up(void)
+{
+    if (gui_state.selected)
+    {
+        if (LFO_SUBSEL_SHAPE != gui_state.subsel.lfo)
+        {
+            --gui_state.subsel.lfo;
+        }
+    }
+    // else no action
+}
+
+static void gui_nav_lfo_down(void)
+{
+    if (gui_state.selected)
+    {
+        if (LFO_SUBSEL_DST_PITCH != gui_state.subsel.lfo)
+        {
+            ++gui_state.subsel.lfo;
+        }
+    }
+    // else no action
 }
 
 void gui_select(void)
@@ -988,15 +1196,15 @@ bool gui_recv_continuous_input(joypad_buttons_t buttons_pressed)
     if (gui_state.selected)
     {
         if ((buttons_pressed.d_left || buttons_pressed.d_right)
-            && (((MAIN_SEL_OSC_1 == gui_state.sel) || (MAIN_SEL_OSC_2 == gui_state.sel))
-                && (MAIN_OSC_SUBSEL_GAIN == gui_state.subsel.osc)))
+            && (((SEL_OSC_1 == gui_state.sel) || (SEL_OSC_2 == gui_state.sel))
+                && (OSC_SUBSEL_GAIN == gui_state.subsel.osc)))
         {
             ret = true;
         }
         else if ((buttons_pressed.d_up || buttons_pressed.d_down)
-                 && ((MAIN_SEL_ENV_1 == gui_state.sel)
-                     || (MAIN_SEL_ENV_2 == gui_state.sel)
-                     || (MAIN_SEL_ENV_3 == gui_state.sel)))
+                 && ((SEL_ENV_1 == gui_state.sel)
+                     || (SEL_ENV_2 == gui_state.sel)
+                     || (SEL_ENV_3 == gui_state.sel)))
         {
             ret = true;
         }
