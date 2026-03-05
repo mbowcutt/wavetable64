@@ -13,6 +13,7 @@ typedef struct {
     enum oscillator_shape_e shape;
     uint32_t phase_pos;
     uint32_t tune;
+    float rate;
     short cur_amplitude;
     short depth;
     uint8_t  dst;
@@ -21,6 +22,7 @@ typedef struct {
 extern lfo_t lfos[NUM_LFOS];
 
 void lfo_init(void);
+void lfo_set_rate(size_t lfo_idx, float rate);
 
 /// Tick the LFO by the given number of ticks. Increments the phase position
 /// and stores the new amplitude.

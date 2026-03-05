@@ -532,15 +532,13 @@ static void gui_draw_lfo(void)
         }
 
         lfo_t * lfo = &lfos[lfo_idx];
-        float rate = 0.0f;
-        float depth = 0.0f;
 
         rdpq_text_printf(NULL, 1, x_base, y_base, "LFO %d", lfo_idx + 1);
         rdpq_text_printf(NULL, 1, x_base, y_base + 10, "SHAPE: %s", get_osc_shape_str(lfo->shape));
-        rdpq_text_printf(NULL, 1, x_base, y_base + 20, "RATE: %f", rate);
-        rdpq_text_printf(NULL, 1, x_base, y_base + 30, "DEPTH: %f", depth);
-        rdpq_text_printf(NULL, 1, x_base, y_base + 40, "AMPLITUDE....%c", (LFO_DST_AMP & lfo->dst) ? 'Y':'N' );
-        rdpq_text_printf(NULL, 1, x_base, y_base + 50, "PITCH........%c", (LFO_DST_FREQ & lfo->dst) ? 'Y':'N' );
+        rdpq_text_printf(NULL, 1, x_base, y_base + 20, "RATE: %.2f Hz", lfo->rate);
+        rdpq_text_printf(NULL, 1, x_base, y_base + 30, "DEPTH: %.2f%%", ((float)lfo->depth * 100) / INT16_MAX);
+        rdpq_text_printf(NULL, 1, x_base, y_base + 40, "TREMOLO......%c", (LFO_DST_AMP & lfo->dst) ? 'Y':'N' );
+        rdpq_text_printf(NULL, 1, x_base, y_base + 50, "VIBRATO......%c", (LFO_DST_FREQ & lfo->dst) ? 'Y':'N' );
 
         x_base += 105;
     }
@@ -1058,6 +1056,8 @@ static void gui_nav_env_up(void)
     }
 }
 
+#define LFO_DEPTH_GRANULE (INT16_MAX / 2000)
+
 static void gui_nav_lfo_left(void)
 {
     uint8_t lfo_idx = (gui_state.sel - SEL_LFO_1);
@@ -1077,10 +1077,28 @@ static void gui_nav_lfo_left(void)
                 }
                 break;
 
-            /// TODO: Set Rate and Depth
             case LFO_SUBSEL_RATE:
+                if (0.05 >= lfo->rate)
+                {
+                    lfo_set_rate(lfo_idx, 0);
+                }
+                else
+                {
+                    lfo_set_rate(lfo_idx, (lfo->rate - 0.05));
+                }
                 break;
+
             case LFO_SUBSEL_DEPTH:
+                if ((INT16_MIN + LFO_DEPTH_GRANULE) > lfo->depth)
+                {
+                    // lfo_set_depth(lfo_idx, INT16_MIN);
+                    lfo->depth = INT16_MIN;
+                }
+                else
+                {
+                    // lfo_set_depth(lfo_idx, (lfo->depth - LFO_DEPTH_GRANULE));
+                    lfo->depth -= LFO_DEPTH_GRANULE;
+                }
                 break;
 
             case LFO_SUBSEL_DST_AMP:
@@ -1122,10 +1140,19 @@ static void gui_nav_lfo_right(void)
                 }
                 break;
 
-            /// TODO: Set Rate and Depth
             case LFO_SUBSEL_RATE:
+                lfo_set_rate(lfo_idx, (lfo->rate + 0.05));
                 break;
+
             case LFO_SUBSEL_DEPTH:
+                if ((INT16_MAX - LFO_DEPTH_GRANULE) < lfo->depth)
+                {
+                    lfo->depth = INT16_MAX;
+                }
+                else
+                {
+                    lfo->depth += LFO_DEPTH_GRANULE;
+                }
                 break;
 
             case LFO_SUBSEL_DST_AMP:
@@ -1205,6 +1232,13 @@ bool gui_recv_continuous_input(joypad_buttons_t buttons_pressed)
                  && ((SEL_ENV_1 == gui_state.sel)
                      || (SEL_ENV_2 == gui_state.sel)
                      || (SEL_ENV_3 == gui_state.sel)))
+        {
+            ret = true;
+        }
+        else if ((buttons_pressed.d_left || buttons_pressed.d_right)
+                 && (((SEL_LFO_1 == gui_state.sel) || (SEL_LFO_2 == gui_state.sel))
+                     && ((LFO_SUBSEL_RATE == gui_state.subsel.lfo)
+                         || (LFO_SUBSEL_DEPTH == gui_state.subsel.lfo))))
         {
             ret = true;
         }
