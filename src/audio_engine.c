@@ -104,7 +104,7 @@ static inline int32_t get_next_sample(void)
         }
 
         // Increment phase
-        voice->phase += voice->tune;
+        voice->phase += lfo_mod_tune(voice->tune);
     }
 
     int16_t gain = lfo_mod_gain(mix_gain_factor);

@@ -580,6 +580,19 @@ void gui_screen_prev(void)
     {
         --gui_state.screen;
     }
+
+    switch(gui_state.screen)
+    {
+        case SCREEN_OSC_ENV:
+            gui_state.sel = SEL_OSC_1;
+            break;
+        case SCREEN_LFO:
+            gui_state.sel = SEL_LFO_1;
+            break;
+        default:
+            break;
+    }
+
     gui_state.selected = false;
 }
 
@@ -1067,14 +1080,15 @@ static void gui_nav_lfo_left(void)
         switch (gui_state.subsel.lfo)
         {
             case LFO_SUBSEL_SHAPE:
-                if (NONE == lfo->shape)
+                if (SINE == lfo->shape)
                 {
-                    lfo->shape = SINE;
+                    lfo->shape = NONE;
                 }
                 else
                 {
                     --lfo->shape;
                 }
+                lfo->cur_amplitude = 0;
                 break;
 
             case LFO_SUBSEL_RATE:
@@ -1091,12 +1105,10 @@ static void gui_nav_lfo_left(void)
             case LFO_SUBSEL_DEPTH:
                 if ((INT16_MIN + LFO_DEPTH_GRANULE) > lfo->depth)
                 {
-                    // lfo_set_depth(lfo_idx, INT16_MIN);
                     lfo->depth = INT16_MIN;
                 }
                 else
                 {
-                    // lfo_set_depth(lfo_idx, (lfo->depth - LFO_DEPTH_GRANULE));
                     lfo->depth -= LFO_DEPTH_GRANULE;
                 }
                 break;
@@ -1138,6 +1150,7 @@ static void gui_nav_lfo_right(void)
                 {
                     ++lfo->shape;
                 }
+                lfo->cur_amplitude = 0;
                 break;
 
             case LFO_SUBSEL_RATE:

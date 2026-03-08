@@ -81,4 +81,19 @@ static inline int16_t lfo_mod_gain(uint8_t base_gain)
     return gain;
 }
 
+static inline uint32_t lfo_mod_tune(uint32_t base_tune)
+{
+    int32_t tune_mod = 0;
+    for (size_t lfo_idx = 0; lfo_idx < NUM_LFOS; ++lfo_idx)
+    {
+        lfo_t * lfo = &lfos[lfo_idx];
+        if (LFO_DST_FREQ & lfo->dst)
+        {
+            tune_mod += (lfo->cur_amplitude * lfo->depth * (int64_t)base_tune) >> 31;
+        }
+    }
+
+    return base_tune + tune_mod;
+}
+
 #endif
