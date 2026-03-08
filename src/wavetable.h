@@ -16,8 +16,8 @@
 /// Enum representing the oscillator waveforms.
 enum oscillator_shape_e {
     SINE,
-    TRIANGLE,
     SQUARE,
+    TRIANGLE,
     RAMP,
     NUM_OSC_TYPES,
 
