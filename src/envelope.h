@@ -1,7 +1,7 @@
 #ifndef ENVELOPE_H
 #define ENVELOPE_H
 
-#include <midi.h>
+#include <midi64.h>
 #include <stdint.h>
 
 #define NUM_ENVELOPES 3

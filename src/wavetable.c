@@ -6,7 +6,7 @@
 #include "init.h"
 
 #include <libdragon.h>
-#include <midi.h>
+#include <midi64.h>
 
 #include <stdbool.h>
 #include <stddef.h>

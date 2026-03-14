@@ -1,0 +1,3 @@
+[submodule "midi64"]
+	path = midi64
+	url = git@github.com:mbowcutt/midi64.git

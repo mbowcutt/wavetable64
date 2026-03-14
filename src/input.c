@@ -6,7 +6,7 @@
 #include "wavetable.h"
 
 #include <libdragon.h>
-#include <midi.h>
+#include <midi64.h>
 
 #include <stddef.h>
 

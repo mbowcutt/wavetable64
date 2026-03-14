@@ -7,7 +7,7 @@
 #include "envelope.h"
 #include "wavetable.h"
 
-#include <midi.h>
+#include <midi64.h>
 
 #define POLYPHONY_COUNT 8
 

@@ -8,7 +8,7 @@
 #include "wavetable.h"
 
 #include <libdragon.h>
-#include <midi.h>
+#include <midi64.h>
 #include <rdpq.h>
 #include <rdpq_rect.h>
 #include <rdpq_text.h>

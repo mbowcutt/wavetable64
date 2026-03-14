@@ -5,7 +5,7 @@
 #include "wavetable.h"
 
 #include <n64sys.h>
-#include <midi.h>
+#include <midi64.h>
 
 #include <stddef.h>
 #include <stdint.h>
