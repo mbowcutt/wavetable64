@@ -3,6 +3,7 @@
 #include "init.h"
 #include "audio_engine.h"
 #include "envelope.h"
+#include "input.h"
 #include "lfo.h"
 #include "voice.h"
 #include "wavetable.h"
@@ -89,6 +90,10 @@ static void gui_draw_env(uint8_t env_idx, int x_base, int y_base);
 
 static void gui_draw_lfo(void);
 
+static void gui_draw_screen_debug(void);
+
+static void gui_draw_settings(void);
+
 static char * get_osc_shape_str(enum oscillator_shape_e osc_shape);
 
 static void gui_nav_osc_env_right(void);
@@ -110,6 +115,11 @@ static void gui_nav_lfo_left(void);
 static void gui_nav_lfo_right(void);
 static void gui_nav_lfo_up(void);
 static void gui_nav_lfo_down(void);
+
+static void gui_nav_settings_left(void);
+static void gui_nav_settings_right(void);
+static void gui_nav_settings_up(void);
+static void gui_nav_settings_down(void);
 
 static color_t color_red = RGBA32(0xFF, 0, 0, 0xFF);
 static color_t color_green = RGBA32(0, 0xFF, 0, 0xFF);
@@ -155,8 +165,10 @@ void gui_draw_screen(void)
         case SCREEN_FILE:
             break;
         case SCREEN_DEBUG:
+            gui_draw_screen_debug();
             break;
         case SCREEN_SETTINGS:
+            gui_draw_settings();
             break;
         default:
             break;
@@ -544,6 +556,17 @@ static void gui_draw_lfo(void)
     }
 }
 
+static void gui_draw_screen_debug(void)
+{
+    rdpq_text_printf(NULL, 1, 96, 48, "MIDI IN BYTE COUNT: %u", input_get_midi_in_byte_count());
+    rdpq_text_printf(NULL, 1, 96, 56, "MIDI RX COUNT: %lu", input_get_midi_rx_ctr());
+}
+
+static void gui_draw_settings(void)
+{
+    rdpq_text_printf(NULL, 1, 96, 48, "MIDI BASIC CHANNEL: %u", 1 + input_get_basic_channel());
+}
+
 void gui_screen_next(void)
 {
     if (SCREEN_SETTINGS == gui_state.screen)
@@ -624,6 +647,8 @@ void gui_nav_right(void)
             break;
         case SCREEN_LFO:
             gui_nav_lfo_right();
+        case SCREEN_SETTINGS:
+            gui_nav_settings_right();
         default:
             break;
     }
@@ -638,6 +663,8 @@ void gui_nav_left(void)
             break;
         case SCREEN_LFO:
             gui_nav_lfo_left();
+        case SCREEN_SETTINGS:
+            gui_nav_settings_left();
         default:
             break;
     }
@@ -652,6 +679,8 @@ void gui_nav_up(void)
             break;
         case SCREEN_LFO:
             gui_nav_lfo_up();
+        case SCREEN_SETTINGS:
+            gui_nav_settings_up();
         default:
             break;
     }
@@ -666,6 +695,8 @@ void gui_nav_down(void)
             break;
         case SCREEN_LFO:
             gui_nav_lfo_down();
+        case SCREEN_SETTINGS:
+            gui_nav_settings_down();
         default:
             break;
     }
@@ -1210,6 +1241,44 @@ static void gui_nav_lfo_down(void)
         }
     }
     // else no action
+}
+
+static void gui_nav_settings_left(void)
+{
+    uint8_t midi_ch_basic = input_get_basic_channel();
+    if (0 == midi_ch_basic)
+    {
+        midi_ch_basic = 0x0F;
+    }
+    else
+    {
+        midi_ch_basic -= 1;
+    }
+    input_set_basic_channel(midi_ch_basic);
+}
+
+static void gui_nav_settings_right(void)
+{
+    uint8_t midi_ch_basic = input_get_basic_channel();
+    if (0x0F == midi_ch_basic)
+    {
+        midi_ch_basic = 0;
+    }
+    else
+    {
+        midi_ch_basic += 1;
+    }
+    input_set_basic_channel(midi_ch_basic);
+}
+
+static void gui_nav_settings_up(void)
+{
+    
+}
+
+static void gui_nav_settings_down(void)
+{
+    
 }
 
 void gui_select(void)

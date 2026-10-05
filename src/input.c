@@ -27,10 +27,22 @@ static uint8_t midi_in_buffer[MIDI_RX_PAYLOAD] = {0};
 
 static bool input_handle_midi(size_t midi_in_bytes);
 static uint16_t nrpn = 0;
+static uint8_t midi_ch_basic = 0;
 
 void input_init(void)
 {
     joypad_init();
+}
+
+
+size_t input_get_midi_in_byte_count(void)
+{
+    return midi_in_bytes;
+}
+
+uint32_t input_get_midi_rx_ctr(void)
+{
+    return midi_rx_ctr;
 }
 
 bool input_poll_and_handle(void)
@@ -126,6 +138,16 @@ bool input_poll_and_handle(void)
     return update_graphics;
 }
 
+uint8_t input_get_basic_channel(void)
+{
+    return midi_ch_basic;
+}
+
+void input_set_basic_channel(uint8_t channel)
+{
+    midi_ch_basic = channel;
+}
+
 static bool input_handle_midi(size_t midi_in_bytes)
 {
     static midi_parser_state midi_parser = {0};
@@ -140,8 +162,8 @@ static bool input_handle_midi(size_t midi_in_bytes)
     {
         midi_msg msg = msg_buf[msg_idx];
 
-        if ((MIDI_NOTE_OFF == (msg.status & 0xF0))
-            || ((MIDI_NOTE_ON == (msg.status & 0xF0)) && (0 == msg.data[1])))
+        if ((msg.status == (MIDI_NOTE_OFF | midi_ch_basic))
+            || ((msg.status == (MIDI_NOTE_ON | midi_ch_basic)) && (0 == msg.data[1])))
         {
             if (msg.data[0] >= MIDI_MAX_DATA_BYTE)
                 continue;
@@ -151,7 +173,7 @@ static bool input_handle_midi(size_t midi_in_bytes)
                 voice_note_off(voice);
             }
         }
-        else if (MIDI_NOTE_ON == (msg.status & 0xF0))
+        else if (msg.status == (MIDI_NOTE_ON | midi_ch_basic))
         {
             if (msg.data[0] >= MIDI_MAX_DATA_BYTE)
                 continue;
@@ -159,7 +181,7 @@ static bool input_handle_midi(size_t midi_in_bytes)
             voice_t * voice = voice_find_next();
             voice_note_on(voice, msg.data[0]);
         }
-        else if (MIDI_CONTROL_CHANGE == (msg.status & 0xF0))
+        else if (msg.status == (MIDI_CONTROL_CHANGE | midi_ch_basic))
         {
             switch (msg.data[0])
             {
