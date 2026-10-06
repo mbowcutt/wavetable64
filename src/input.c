@@ -21,13 +21,24 @@
 #define MIDI_CC_GAIN 117
 #define MIDI_NRPN_OSC1_SHAPE 0x0003
 
+#define MIDI_NOTE_D3 50
+
 static size_t midi_in_bytes = 0;
 static uint32_t midi_rx_ctr = 0;
 static uint8_t midi_in_buffer[MIDI_RX_PAYLOAD] = {0};
 
-static bool input_handle_midi(size_t midi_in_bytes);
 static uint16_t nrpn = 0;
 static uint8_t midi_ch_basic = 0;
+static bool ocarina_mode = false;
+static uint8_t ocarina_root = MIDI_NOTE_D3;
+
+static bool input_handle_midi(size_t midi_in_bytes);
+static bool handle_button_press(joypad_buttons_t buttons);
+static bool handle_buttons_held(joypad_buttons_t buttons);
+static bool handle_ocarina(void);
+static void handle_ocarina_note_press(void);
+static void handle_ocarina_shoulder_press(void);
+static void handle_ocarina_shoulder_release(void);
 
 void input_init(void)
 {
@@ -50,75 +61,31 @@ bool input_poll_and_handle(void)
     bool update_graphics = false;
 
     joypad_poll();
-    joypad_buttons_t buttons = joypad_get_buttons_pressed(JOYPAD_PORT_1);
-    if (buttons.raw)
+    joypad_buttons_t buttons_pressed = joypad_get_buttons_pressed(JOYPAD_PORT_1);
+    joypad_buttons_t buttons_released = joypad_get_buttons_released(JOYPAD_PORT_1);
+    joypad_buttons_t buttons_held = joypad_get_buttons_held(JOYPAD_PORT_1);
+
+    if (!ocarina_mode)
     {
-        if (buttons.l)
+        if (buttons_pressed.raw)
         {
-            gui_screen_prev();
-            update_graphics = true;
+            update_graphics = handle_button_press(buttons_pressed);
         }
-        else if (buttons.r)
+        else if (buttons_held.raw && gui_recv_continuous_input(buttons_held))
         {
-            gui_screen_next();
-            update_graphics = true;
-        }
-        else if (buttons.d_right)
-        {
-            gui_nav_right();
-            update_graphics = true;
-        }
-        else if (buttons.d_left)
-        {
-            gui_nav_left();
-            update_graphics = true;
-        }
-        else if (buttons.d_up)
-        {
-            gui_nav_up();
-            update_graphics = true;
-        }
-        else if (buttons.d_down)
-        {
-            gui_nav_down();
-            update_graphics = true;
-        }
-        else if (buttons.a)
-        {
-            gui_select();
-            update_graphics = true;
-        }
-        else if (buttons.b)
-        {
-            gui_deselect();
-            update_graphics = true;
+            update_graphics = handle_buttons_held(buttons_held);
         }
     }
     else
     {
-        buttons = joypad_get_buttons_held(JOYPAD_PORT_1);
-        if (buttons.raw && gui_recv_continuous_input(buttons))
+        if (buttons_pressed.start)
         {
-            if (buttons.d_right)
-            {
-                gui_nav_right();
-                update_graphics = true;
-            }
-            else if (buttons.d_left)
-            {
-                gui_nav_left();
-                update_graphics = true;
-            }
-            else if (buttons.d_up)
-            {
-                gui_nav_up();
-                update_graphics = true;
-            }
-            else if (buttons.d_down)
-            {
-                gui_nav_down();
-                update_graphics = true;
-            }
+            ocarina_mode = false;
+            update_graphics = true;
+        }
+        else
+        {
+            update_graphics = handle_ocarina();
         }
     }
 
@@ -136,6 +103,261 @@ bool input_poll_and_handle(void)
     }
 
     return update_graphics;
+}
+
+static bool handle_button_press(joypad_buttons_t buttons)
+{
+    bool update_graphics = false;
+
+    if (buttons.l)
+    {
+        gui_screen_prev();
+        update_graphics = true;
+    }
+    else if (buttons.r)
+    {
+        gui_screen_next();
+        update_graphics = true;
+    }
+    else if (buttons.d_right)
+    {
+        gui_nav_right();
+        update_graphics = true;
+    }
+    else if (buttons.d_left)
+    {
+        gui_nav_left();
+        update_graphics = true;
+    }
+    else if (buttons.d_up)
+    {
+        gui_nav_up();
+        update_graphics = true;
+    }
+    else if (buttons.d_down)
+    {
+        gui_nav_down();
+        update_graphics = true;
+    }
+    else if (buttons.a)
+    {
+        gui_select();
+        update_graphics = true;
+    }
+    else if (buttons.b)
+    {
+        gui_deselect();
+        update_graphics = true;
+    }
+    else if (buttons.start)
+    {
+        ocarina_mode = true;
+    }
+
+    return update_graphics;
+}
+
+static bool handle_buttons_held(joypad_buttons_t buttons)
+{
+    bool update_graphics = false;
+
+    if (buttons.d_right)
+    {
+        gui_nav_right();
+        update_graphics = true;
+    }
+    else if (buttons.d_left)
+    {
+        gui_nav_left();
+        update_graphics = true;
+    }
+    else if (buttons.d_up)
+    {
+        gui_nav_up();
+        update_graphics = true;
+    }
+    else if (buttons.d_down)
+    {
+        gui_nav_down();
+        update_graphics = true;
+    }
+
+    return update_graphics;
+}
+
+static bool handle_ocarina(void)
+{
+    bool update_graphics = false;
+    joypad_buttons_t btn_press = joypad_get_buttons_pressed(JOYPAD_PORT_1);
+    joypad_buttons_t btn_release = joypad_get_buttons_released(JOYPAD_PORT_1);
+    joypad_buttons_t btn_held = joypad_get_buttons_held(JOYPAD_PORT_1);
+
+    if (btn_press.a
+        || btn_press.c_down
+        || btn_press.c_right
+        || btn_press.c_left
+        || btn_press.c_up)
+    {
+        handle_ocarina_note_press();
+        update_graphics = true;
+    }
+
+    if (btn_press.l
+        || btn_press.z
+        || btn_press.r)
+    {
+        handle_ocarina_shoulder_press();
+        update_graphics = true;
+    }
+
+    if (btn_release.l
+        || btn_release.z
+        || btn_release.r)
+    {
+        handle_ocarina_shoulder_release();
+        update_graphics = true;
+    }
+
+    if (btn_release.a
+        || btn_release.c_down
+        || btn_release.c_right
+        || btn_release.c_left
+        || btn_release.c_up)
+    {
+        if ( ! (btn_press.a
+                || btn_press.c_down
+                || btn_press.c_right
+                || btn_press.c_left
+                || btn_press.c_up
+                || btn_held.a
+                || btn_held.c_down
+                || btn_held.c_right
+                || btn_held.c_left
+                || btn_held.c_up) )
+        {
+            voice_t * voice = voice_get(0);
+            voice_note_off(voice);
+            update_graphics = true;
+        }
+    }
+
+    // TODO: Analog stick mod pitch & vibrato
+    joypad_inputs_t inputs = joypad_get_inputs(JOYPAD_PORT_1);
+    (void) inputs.stick_x;
+    (void) inputs.stick_y;
+
+    return update_graphics;
+}
+
+static void handle_ocarina_note_press(void)
+{
+    uint8_t note = 0xFF;
+
+    joypad_buttons_t btn_press = joypad_get_buttons_pressed(JOYPAD_PORT_1);
+
+    if (btn_press.a)
+    {
+        note = ocarina_root;
+    }
+    else if (btn_press.c_down)
+    {
+        note = ocarina_root + 3;
+    }
+    else if (btn_press.c_right)
+    {
+        note = ocarina_root + 7;
+    }
+    else if (btn_press.c_left)
+    {
+        note = ocarina_root + 9;
+    }
+    else if (btn_press.c_up)
+    {
+        note = ocarina_root + 12;
+    }
+
+    if (note != 0xFF)
+    {
+        joypad_buttons_t btn_held = joypad_get_buttons_held(JOYPAD_PORT_1);
+        if (btn_held.r)
+        {
+            note += 1;
+        }
+        if (btn_held.l | btn_held.z)
+        {
+            note -= 1;
+        }
+    }
+
+    if (note != 0xFF)
+    {
+        voice_t * voice = voice_get(0);
+        voice_note_on(voice, note);
+    }
+}
+
+static void handle_ocarina_shoulder_press(void)
+{
+    joypad_buttons_t btn_press = joypad_get_buttons_pressed(JOYPAD_PORT_1);
+    joypad_buttons_t btn_held = joypad_get_buttons_held(JOYPAD_PORT_1);
+
+    voice_t * voice = voice_get(0);
+    uint8_t new_note = voice->note;
+
+    if (btn_press.r)
+    {
+        new_note += 1;
+    }
+    if (btn_press.l || btn_press.z)
+    {
+        new_note -= 1;
+    }
+
+    if (btn_held.a
+        || btn_held.c_down
+        || btn_held.c_right
+        || btn_held.c_left
+        || btn_held.c_up)
+    {
+        voice_note_on(voice, new_note);
+    }
+    else
+    {
+        voice->note = new_note;
+        voice->tune = wavetable_get_midi_tune(new_note);
+    }
+}
+
+static void handle_ocarina_shoulder_release(void)
+{
+    joypad_buttons_t btn_release = joypad_get_buttons_released(JOYPAD_PORT_1);
+    joypad_buttons_t btn_held = joypad_get_buttons_held(JOYPAD_PORT_1);
+
+    voice_t * voice = voice_get(0);
+    uint8_t new_note = voice->note;
+
+    if (btn_release.r)
+    {
+        new_note -= 1;
+    }
+    if (btn_release.l || btn_release.z)
+    {
+        new_note += 1;
+    }
+
+    if (btn_held.a
+        || btn_held.c_down
+        || btn_held.c_right
+        || btn_held.c_left
+        || btn_held.c_up)
+    {
+        voice_note_on(voice, new_note);
+    }
+    else
+    {
+        voice->note = new_note;
+        voice->tune = wavetable_get_midi_tune(new_note);
+    }
 }
 
 uint8_t input_get_basic_channel(void)
