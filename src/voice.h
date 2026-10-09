@@ -29,6 +29,8 @@ voice_t * voice_find_for_note_off(uint8_t note);
 
 void voice_note_on(voice_t * voice, uint8_t note);
 void voice_note_off(voice_t * voice);
+void voice_all_off(void);
+void voice_all_kill(void);
 
 static inline voice_t * voice_get(size_t voice_idx)
 {

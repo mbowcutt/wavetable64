@@ -132,3 +132,22 @@ void voice_note_off(voice_t * voice)
         }
     }
 }
+
+void voice_all_off(void)
+{
+    for (size_t idx = 0; idx < POLYPHONY_COUNT; ++idx)
+    {
+        voice_note_off(&voices[idx]);
+    }
+}
+
+void voice_all_kill(void)
+{
+    for (size_t idx = 0; idx < POLYPHONY_COUNT; ++idx)
+    {
+        for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
+        {
+            voices[idx].amp_env_state[wav_idx].stage = IDLE;
+        }
+    }
+}

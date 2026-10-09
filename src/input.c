@@ -463,6 +463,15 @@ static bool input_handle_midi(size_t midi_in_bytes)
                             break;
                     }
                     break;
+                case MIDI_MODE_ALL_SOUND_OFF:
+                    voice_all_kill();
+                    break;
+                case MIDI_MODE_ALL_NOTES_OFF:
+                    // TODO: Only turn MIDI notes off
+                    voice_all_off();
+                    break;
+                default:
+                    break;
             }
         }
     }
