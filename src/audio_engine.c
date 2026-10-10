@@ -11,20 +11,38 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <math.h>
 
 #define NUM_AUDIO_BUFFERS 4
+#define ANALOG_STICK_MAX 85
 
 static void audio_engine_callback(short * buffer, size_t num_samples);
 static void audio_engine_synthesize(short * buffer, size_t num_samples);
 static inline int32_t get_next_sample(void);
 static inline void tick_envelopes(size_t num_ticks);
+static void generate_pitch_bend_factor_lut(void);
 
 int32_t peak = 0;
 
 static uint8_t mix_gain_factor = 64;
 
+// Pitch bend is implemented as a factor to scale the base phase step.
+// General equation is phase_step = step * 2 ^ (bend_semitones / 12)
+static float pitch_bend_factor_lut[ANALOG_STICK_MAX];
+
+static void generate_pitch_bend_factor_lut(void)
+{
+    for (size_t idx = 0; idx < ANALOG_STICK_MAX; ++idx)
+    {
+        float bend_semitones = 2.0f * (((float)idx - ANALOG_STICK_MAX) / ANALOG_STICK_MAX);
+        pitch_bend_factor_lut[idx] = powf(2, bend_semitones / 12.0f);
+    }
+}
+
 void audio_engine_init(void)
 {
+    generate_pitch_bend_factor_lut();
+
     audio_init(SAMPLE_RATE, NUM_AUDIO_BUFFERS);
     gui_splash(ALLOC_MIX_BUF);
 
