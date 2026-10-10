@@ -55,6 +55,11 @@ void audio_engine_set_pitch_bend_factor(float factor)
     }
 }
 
+void audio_engine_set_pitch_bend_factor_from_stick(int8_t stick_pos)
+{
+    audio_engine_set_pitch_bend_factor(pitch_bend_factor_lut[stick_pos + ANALOG_STICK_MAX]);
+}
+
 void audio_engine_init(void)
 {
     generate_pitch_bend_factor_lut();

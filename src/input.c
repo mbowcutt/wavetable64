@@ -31,6 +31,8 @@ static uint16_t nrpn = 0;
 static uint8_t midi_ch_basic = 0;
 static bool ocarina_mode = false;
 static uint8_t ocarina_root = MIDI_NOTE_D3;
+static int8_t last_stick_x = 0;
+static int8_t last_stick_y = 0;
 
 static bool input_handle_midi(size_t midi_in_bytes);
 static bool handle_button_press(joypad_buttons_t buttons);
@@ -246,8 +248,16 @@ static bool handle_ocarina(void)
 
     // TODO: Analog stick mod pitch & vibrato
     joypad_inputs_t inputs = joypad_get_inputs(JOYPAD_PORT_1);
-    (void) inputs.stick_x;
-    (void) inputs.stick_y;
+    if (last_stick_x != inputs.stick_x)
+    {
+        last_stick_x = inputs.stick_x;
+    }
+
+    if (last_stick_y != inputs.stick_y)
+    {
+        audio_engine_set_pitch_bend_factor_from_stick(inputs.stick_y);
+        last_stick_y = inputs.stick_y;
+    }
 
     return update_graphics;
 }
@@ -478,6 +488,12 @@ static bool input_handle_midi(size_t midi_in_bytes)
                 default:
                     break;
             }
+        }
+        else if (msg.status == (MIDI_PITCH_BEND | midi_ch_basic))
+        {
+            uint16_t val = msg.data[0] << 7 | msg.data[1];
+            float bend_semitones = (val - 8192) / 8192.0f;
+            audio_engine_set_pitch_bend_factor(powf(2.0, (2 * bend_semitones) / 12));
         }
     }
 
