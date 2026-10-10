@@ -28,15 +28,15 @@ static uint8_t mix_gain_factor = 64;
 
 // Pitch bend is implemented as a factor to scale the base phase step.
 // General equation is phase_step = step * 2 ^ (bend_semitones / 12)
-static float pitch_bend_factor_lut[ANALOG_STICK_MAX];
+static float pitch_bend_factor_lut[ANALOG_STICK_MAX * 2];
 static float cur_pitch_bend_factor;
 
 static void generate_pitch_bend_factor_lut(void)
 {
-    for (size_t idx = 0; idx < ANALOG_STICK_MAX; ++idx)
+    for (size_t idx = (-1 * ANALOG_STICK_MAX); idx < ANALOG_STICK_MAX; ++idx)
     {
-        float bend_semitones = 2.0f * (((float)idx - ANALOG_STICK_MAX) / ANALOG_STICK_MAX);
-        pitch_bend_factor_lut[idx] = powf(2, bend_semitones / 12.0f);
+        float bend_semitones = 2.0f * ((float)idx / ANALOG_STICK_MAX);
+        pitch_bend_factor_lut[idx + ANALOG_STICK_MAX] = powf(2, bend_semitones / 12.0f);
     }
 }
 
