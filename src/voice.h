@@ -23,12 +23,9 @@ typedef struct
 extern voice_t voices[POLYPHONY_COUNT];
 
 void voice_init(void);
-
-voice_t * voice_find_next(void);
-voice_t * voice_find_for_note_off(uint8_t note);
-
-void voice_note_on(voice_t * voice, uint8_t note);
-void voice_note_off(voice_t * voice);
+void voice_set_mono(bool enable);
+void voice_note_on(uint8_t note, uint8_t vel);
+void voice_note_off(uint8_t note);
 void voice_all_off(void);
 void voice_all_kill(void);
 

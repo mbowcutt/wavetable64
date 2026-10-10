@@ -81,6 +81,8 @@ bool input_poll_and_handle(void)
         if (buttons_pressed.start)
         {
             ocarina_mode = false;
+            voice_all_off();
+            voice_set_mono(false);
             update_graphics = true;
         }
         else
@@ -152,6 +154,8 @@ static bool handle_button_press(joypad_buttons_t buttons)
     else if (buttons.start)
     {
         ocarina_mode = true;
+        voice_all_off();
+        voice_set_mono(true);
     }
 
     return update_graphics;
@@ -235,8 +239,7 @@ static bool handle_ocarina(void)
                 || btn_held.c_left
                 || btn_held.c_up) )
         {
-            voice_t * voice = voice_get(0);
-            voice_note_off(voice);
+            voice_all_off();
             update_graphics = true;
         }
     }
@@ -291,8 +294,7 @@ static void handle_ocarina_note_press(void)
 
     if (note != 0xFF)
     {
-        voice_t * voice = voice_get(0);
-        voice_note_on(voice, note);
+        voice_note_on(note, MIDI_MAX_DATA_BYTE);
     }
 }
 
@@ -319,7 +321,7 @@ static void handle_ocarina_shoulder_press(void)
         || btn_held.c_left
         || btn_held.c_up)
     {
-        voice_note_on(voice, new_note);
+        voice_note_on(new_note, MIDI_MAX_DATA_BYTE);
     }
     else
     {
@@ -351,7 +353,7 @@ static void handle_ocarina_shoulder_release(void)
         || btn_held.c_left
         || btn_held.c_up)
     {
-        voice_note_on(voice, new_note);
+        voice_note_on(new_note, MIDI_MAX_DATA_BYTE);
     }
     else
     {
@@ -387,21 +389,18 @@ static bool input_handle_midi(size_t midi_in_bytes)
         if ((msg.status == (MIDI_NOTE_OFF | midi_ch_basic))
             || ((msg.status == (MIDI_NOTE_ON | midi_ch_basic)) && (0 == msg.data[1])))
         {
-            if (msg.data[0] >= MIDI_MAX_DATA_BYTE)
-                continue;
-            voice_t * voice = voice_find_for_note_off(msg.data[0]);
-            if (voice)
+            if (msg.data[0] < MIDI_MAX_DATA_BYTE)
             {
-                voice_note_off(voice);
+                voice_note_off(msg.data[0]);
             }
         }
         else if (msg.status == (MIDI_NOTE_ON | midi_ch_basic))
         {
-            if (msg.data[0] >= MIDI_MAX_DATA_BYTE)
-                continue;
-            // TODO: Handle velocity
-            voice_t * voice = voice_find_next();
-            voice_note_on(voice, msg.data[0]);
+            if ((msg.data[0] < MIDI_MAX_DATA_BYTE)
+                || (msg.data[1] < MIDI_MAX_DATA_BYTE))
+            {
+                voice_note_on(msg.data[0], msg.data[1]);
+            }
         }
         else if (msg.status == (MIDI_CONTROL_CHANGE | midi_ch_basic))
         {
@@ -469,6 +468,12 @@ static bool input_handle_midi(size_t midi_in_bytes)
                 case MIDI_MODE_ALL_NOTES_OFF:
                     // TODO: Only turn MIDI notes off
                     voice_all_off();
+                    break;
+                case MIDI_MODE_POLY_OFF:
+                    voice_set_mono(false);
+                    break;
+                case MIDI_MODE_POLY_ON:
+                    voice_set_mono(true);
                     break;
                 default:
                     break;

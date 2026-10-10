@@ -12,6 +12,12 @@
 
 voice_t voices[POLYPHONY_COUNT];
 
+static bool mono = false;
+
+static voice_t * voice_find_next(void);
+static voice_t * voice_find_for_note_off(uint8_t note);
+static void voice_all_osc_off(voice_t * voice);
+
 void voice_init(void)
 {
     for (size_t voice_idx = 0; voice_idx < POLYPHONY_COUNT; ++voice_idx)
@@ -31,9 +37,58 @@ void voice_init(void)
     }
 }
 
+void voice_set_mono(bool enable)
+{
+    mono = enable;
+}
 
+void voice_note_on(uint8_t note, uint8_t vel)
+{
+    // TODO: Handle velocity
+    (void) vel;
 
-voice_t * voice_find_next(void)
+    voice_t * voice = mono ? &voices[0] : voice_find_next();
+    voice->note = note;
+    voice->tune = wavetable_get_midi_tune(note);
+    for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
+    {
+        if (NONE != oscillators[wav_idx].shape)
+        {
+            voice->amp_env_state[wav_idx].stage = ATTACK;
+            voice->amp_env_state[wav_idx].rate
+                = (UINT32_MAX - voice->amp_env_state[wav_idx].level)
+                    / envelope_get_trans_samples(oscillators[wav_idx].amp_env_idx, ATTACK);
+        }
+    }
+    voice->timestamp = get_ticks();
+}
+
+void voice_note_off(uint8_t note)
+{
+    voice_t * voice = mono ? &voices[0] : voice_find_for_note_off(note);
+    voice_all_osc_off(voice);
+}
+
+void voice_all_off(void)
+{
+    for (size_t idx = 0; idx < POLYPHONY_COUNT; ++idx)
+    {
+        voice_all_osc_off(&voices[idx]);
+    }
+}
+
+void voice_all_kill(void)
+{
+    for (size_t idx = 0; idx < POLYPHONY_COUNT; ++idx)
+    {
+        for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
+        {
+            voices[idx].amp_env_state[wav_idx].stage = IDLE;
+        }
+    }
+}
+
+static voice_t * voice_find_next(void)
 {
     voice_t * voice = NULL;
 
@@ -71,7 +126,7 @@ voice_t * voice_find_next(void)
     return voice;
 }
 
-voice_t * voice_find_for_note_off(uint8_t note)
+static voice_t * voice_find_for_note_off(uint8_t note)
 {
     voice_t * voice = NULL;
 
@@ -100,25 +155,7 @@ voice_t * voice_find_for_note_off(uint8_t note)
     return voice;
 }
 
-
-void voice_note_on(voice_t * voice, uint8_t note)
-{
-    voice->note = note;
-    voice->tune = wavetable_get_midi_tune(note);
-    for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
-    {
-        if (NONE != oscillators[wav_idx].shape)
-        {
-            voice->amp_env_state[wav_idx].stage = ATTACK;
-            voice->amp_env_state[wav_idx].rate
-                = (UINT32_MAX - voice->amp_env_state[wav_idx].level)
-                    / envelope_get_trans_samples(oscillators[wav_idx].amp_env_idx, ATTACK);
-        }
-    }
-    voice->timestamp = get_ticks();
-}
-
-void voice_note_off(voice_t * voice)
+static void voice_all_osc_off(voice_t * voice)
 {
     for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
     {
@@ -129,25 +166,6 @@ void voice_note_off(voice_t * voice)
                 voice->amp_env_state[wav_idx].stage = RELEASE;
                 voice->amp_env_state[wav_idx].rate = (voice->amp_env_state[wav_idx].level - 0) / envelope_get_trans_samples(oscillators[wav_idx].amp_env_idx, RELEASE);
             }
-        }
-    }
-}
-
-void voice_all_off(void)
-{
-    for (size_t idx = 0; idx < POLYPHONY_COUNT; ++idx)
-    {
-        voice_note_off(&voices[idx]);
-    }
-}
-
-void voice_all_kill(void)
-{
-    for (size_t idx = 0; idx < POLYPHONY_COUNT; ++idx)
-    {
-        for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
-        {
-            voices[idx].amp_env_state[wav_idx].stage = IDLE;
         }
     }
 }
