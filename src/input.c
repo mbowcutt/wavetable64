@@ -326,7 +326,7 @@ static void handle_ocarina_shoulder_press(void)
     else
     {
         voice->note = new_note;
-        voice->tune = wavetable_get_midi_tune(new_note);
+        voice->tune = (uint32_t)(wavetable_get_midi_tune(new_note) * audio_engine_get_pitch_bend_factor());
     }
 }
 
@@ -358,7 +358,7 @@ static void handle_ocarina_shoulder_release(void)
     else
     {
         voice->note = new_note;
-        voice->tune = wavetable_get_midi_tune(new_note);
+        voice->tune = (uint32_t)(wavetable_get_midi_tune(new_note) * audio_engine_get_pitch_bend_factor());
     }
 }
 

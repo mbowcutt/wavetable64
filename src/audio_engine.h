@@ -13,5 +13,8 @@ void audio_engine_init(void);
 
 void audio_engine_set_gain(uint8_t data);
 
+float audio_engine_get_pitch_bend_factor(void);
+void audio_engine_set_pitch_bend_factor(float factor);
+
 
 #endif
