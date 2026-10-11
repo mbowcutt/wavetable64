@@ -2,6 +2,7 @@
 
 #include "gui.h"
 #include "init.h"
+#include "input.h"
 #include "lfo.h"
 #include "voice.h"
 #include "wavetable.h"
@@ -14,7 +15,6 @@
 #include <math.h>
 
 #define NUM_AUDIO_BUFFERS 4
-#define ANALOG_STICK_MAX 85
 
 static void audio_engine_callback(short * buffer, size_t num_samples);
 static void audio_engine_synthesize(short * buffer, size_t num_samples);
@@ -48,11 +48,6 @@ float audio_engine_get_pitch_bend_factor(void)
 void audio_engine_set_pitch_bend_factor(float factor)
 {
     cur_pitch_bend_factor = factor;
-    for (size_t idx = 0; idx < POLYPHONY_COUNT; ++idx)
-    {
-        voice_t * voice = voice_get(idx);
-        voice->tune = (uint32_t)(wavetable_get_midi_tune(voice->note) * cur_pitch_bend_factor);
-    }
 }
 
 void audio_engine_set_pitch_bend_factor_from_stick(int8_t stick_pos)
@@ -143,7 +138,7 @@ static inline int32_t get_next_sample(void)
         }
 
         // Increment phase
-        voice->phase += lfo_mod_tune(voice->tune);
+        voice->phase += lfo_mod_tune((uint32_t)voice->tune * audio_engine_get_pitch_bend_factor());
     }
 
     int16_t gain = lfo_mod_gain(mix_gain_factor);

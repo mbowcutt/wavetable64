@@ -49,7 +49,7 @@ void voice_note_on(uint8_t note, uint8_t vel)
 
     voice_t * voice = mono ? &voices[0] : voice_find_next();
     voice->note = note;
-    voice->tune = (uint32_t)(wavetable_get_midi_tune(note) * audio_engine_get_pitch_bend_factor());
+    voice->tune = wavetable_get_midi_tune(note);
     for (size_t wav_idx = 0; wav_idx < NUM_OSCILLATORS; ++wav_idx)
     {
         if (NONE != oscillators[wav_idx].shape)

@@ -5,6 +5,8 @@
 #ifndef INPUT_H
 #define INPUT_H
 
+#define ANALOG_STICK_MAX 85
+
 void input_init(void);
 bool input_poll_and_handle(void);
 

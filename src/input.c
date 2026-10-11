@@ -2,6 +2,7 @@
 
 #include "audio_engine.h"
 #include "gui.h"
+#include "lfo.h"
 #include "voice.h"
 #include "wavetable.h"
 
@@ -156,8 +157,15 @@ static bool handle_button_press(joypad_buttons_t buttons)
     else if (buttons.start)
     {
         ocarina_mode = true;
+
         voice_all_off();
         voice_set_mono(true);
+
+        lfos[0].shape = TRIANGLE;
+        lfos[0].dst = LFO_DST_FREQ;
+        lfo_set_rate(0, 5.75);
+
+        update_graphics = true;
     }
 
     return update_graphics;
@@ -246,17 +254,19 @@ static bool handle_ocarina(void)
         }
     }
 
-    // TODO: Analog stick mod pitch & vibrato
     joypad_inputs_t inputs = joypad_get_inputs(JOYPAD_PORT_1);
     if (last_stick_x != inputs.stick_x)
     {
+        lfos[0].depth = (short)(((float)inputs.stick_x / ANALOG_STICK_MAX) * (INT16_MAX/16));
         last_stick_x = inputs.stick_x;
+        update_graphics = true;
     }
 
     if (last_stick_y != inputs.stick_y)
     {
         audio_engine_set_pitch_bend_factor_from_stick(inputs.stick_y);
         last_stick_y = inputs.stick_y;
+        update_graphics = true;
     }
 
     return update_graphics;
@@ -336,7 +346,7 @@ static void handle_ocarina_shoulder_press(void)
     else
     {
         voice->note = new_note;
-        voice->tune = (uint32_t)(wavetable_get_midi_tune(new_note) * audio_engine_get_pitch_bend_factor());
+        voice->tune = wavetable_get_midi_tune(new_note);
     }
 }
 
@@ -368,7 +378,7 @@ static void handle_ocarina_shoulder_release(void)
     else
     {
         voice->note = new_note;
-        voice->tune = (uint32_t)(wavetable_get_midi_tune(new_note) * audio_engine_get_pitch_bend_factor());
+        voice->tune = wavetable_get_midi_tune(new_note);
     }
 }
 
