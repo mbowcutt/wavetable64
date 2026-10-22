@@ -66,7 +66,10 @@ void voice_note_on(uint8_t note, uint8_t vel)
 void voice_note_off(uint8_t note)
 {
     voice_t * voice = mono ? &voices[0] : voice_find_for_note_off(note);
-    voice_all_osc_off(voice);
+    if (voice && (voice->note == note))
+    {
+        voice_all_osc_off(voice);
+    }
 }
 
 void voice_all_off(void)
