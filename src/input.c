@@ -94,7 +94,7 @@ bool input_poll_and_handle(void)
         }
     }
 
-    midi_in_bytes = midi_rx_poll(JOYPAD_PORT_1,
+    midi_in_bytes = midi_poll_joybus(JOYPAD_PORT_1,
                                  midi_in_buffer,
                                  sizeof(midi_in_buffer));
 
@@ -249,7 +249,7 @@ static bool handle_ocarina(void)
                 || btn_held.c_left
                 || btn_held.c_up) )
         {
-            voice_all_off();
+            voice_note_off(voice_get(0)->note);
             update_graphics = true;
         }
     }

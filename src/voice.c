@@ -2,6 +2,7 @@
 
 #include "audio_engine.h"
 #include "envelope.h"
+#include "input.h"
 #include "wavetable.h"
 
 #include <n64sys.h>
@@ -61,15 +62,20 @@ void voice_note_on(uint8_t note, uint8_t vel)
         }
     }
     voice->timestamp = get_ticks();
+    midi_note_on(input_get_basic_channel(), note, vel);
 }
 
 void voice_note_off(uint8_t note)
 {
+    // TODO: handle velocity
+
     voice_t * voice = mono ? &voices[0] : voice_find_for_note_off(note);
     if (voice && (voice->note == note))
     {
         voice_all_osc_off(voice);
     }
+
+    midi_note_off(input_get_basic_channel(), note, MIDI_MAX_DATA_BYTE);
 }
 
 void voice_all_off(void)
