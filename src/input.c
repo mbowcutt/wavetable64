@@ -15,6 +15,7 @@
 #define MIDI_CC_NRPN_LSB 98
 #define MIDI_CC_NRPN_MSB 99
 
+#define MIDI_CC_MOD_STICK_X 1
 #define MIDI_CC_ENV1_ATTACK 14
 #define MIDI_CC_ENV1_DECAY 15
 #define MIDI_CC_ENV1_SUSTAIN 13
@@ -258,6 +259,7 @@ static bool handle_ocarina(void)
     if (last_stick_x != inputs.stick_x)
     {
         lfos[0].depth = (short)(((float)inputs.stick_x / ANALOG_STICK_MAX) * (INT16_MAX/16));
+        midi_cc(midi_ch_basic, MIDI_CC_MOD_STICK_X, inputs.stick_x);
         last_stick_x = inputs.stick_x;
         update_graphics = true;
     }
@@ -265,6 +267,7 @@ static bool handle_ocarina(void)
     if (last_stick_y != inputs.stick_y)
     {
         audio_engine_set_pitch_bend_factor_from_stick(inputs.stick_y);
+        midi_pitch_bend(midi_ch_basic, inputs.stick_y << 7);
         last_stick_y = inputs.stick_y;
         update_graphics = true;
     }
